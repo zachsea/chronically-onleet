@@ -1,0 +1,38 @@
+{
+  "name": "daily-leet",
+  "version": "0.0.1",
+  "description": "Discord bot for daily leetcode problems",
+  "license": "Apache-2.0",
+  "author": "zachsea",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx --env-file-if-exists=.env src/index.ts",
+    "start": "node --env-file-if-exists=.env dist/index.js",
+    "deploy": "tsc && node --env-file-if-exists=.env dist/deploy.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "eslint . --ext .ts",
+    "lint:fix": "eslint . --ext .ts --fix",
+    "format": "prettier --write ."
+  },
+  "dependencies": {
+    "@t3-oss/env-core": "^0.13.8",
+    "discord.js": "^14.23.2",
+    "leetcode-query": "^2.0.1",
+    "turndown": "^7.2.1",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.37.0",
+    "@types/node": "^24.7.0",
+    "eslint": "^9.37.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-prettier": "^5.5.4",
+    "prettier": "3.6.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.0"
+  }
+}
