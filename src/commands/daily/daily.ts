@@ -1,31 +1,31 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction } from "discord.js";
+import { SlashCommandBuilder, ChatInputCommandInteraction, MessageFlags, InteractionContextType } from "discord.js";
 import { getDailyProblem } from "../../services/leetcode-service.js";
+import ProblemContainer from "../../components/leetcode/problem-container.js";
+
+// temp
 
 export const data = new SlashCommandBuilder()
   .setName("daily")
-  .setDescription("Commands related to daily problems")
-  .addSubcommand((subcommand) => subcommand.setName("get").setDescription("Get today's daily problem"));
+  .setDescription("Get the daily LeetCode problem")
+  .addBooleanOption((option) =>
+    option.setName("compact").setDescription("Show a more compact version of the problem, overrides user preference")
+  )
+  .setContexts([InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel]);
 
 export async function execute(interaction: ChatInputCommandInteraction) {
   console.log("Daily command invoked");
-  if (interaction.options.getSubcommand() === "get") {
-    await executeSubGet(interaction);
-  } else {
-    await interaction.reply("Unknown subcommand");
-  }
-}
-
-export async function executeSubGet(interaction: ChatInputCommandInteraction) {
   // fetch daily problem from leetcode service
+  await interaction.reply({ content: "Fetching daily problem..." });
   const dailyProblem = await getDailyProblem();
-  console.log("Fetched daily problem:", dailyProblem);
-  await interaction.reply({
-    embeds: [
-      {
-        title: "Daily LeetCode Problem",
-        description: dailyProblem?.question.content || "(not implemented)",
-        color: 0x00ff00,
-      },
-    ],
-  });
+  if (!dailyProblem) {
+    await interaction.editReply("Could not fetch the daily problem. Please try again later.");
+    return;
+  }
+  // use the components to display the problem for now
+  const components = ProblemContainer(dailyProblem.question);
+  try {
+    await interaction.editReply({ content: null, components, flags: MessageFlags.IsComponentsV2 });
+  } catch (error) {
+    console.error("Error editing reply:", error);
+  }
 }
