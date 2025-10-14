@@ -1,10 +1,9 @@
-import { Client, GatewayIntentBits } from "discord.js";
-import { env } from "./env.js";
-import { registerCommands } from "./commands/index.js";
-import { registerEvents } from "./events/index.js";
+import { ShardingManager } from "discord.js";
+import path from "path";
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.DirectMessages] });
+const botFile = path.join(new URL(".", import.meta.url).pathname, "bot.js");
+const manager = new ShardingManager(botFile);
 
-await registerEvents(client);
-await registerCommands(client);
-await client.login(env.DISCORD_TOKEN);
+manager.on("shardCreate", (shard) => console.log(`Launched shard ${shard.id}`));
+
+await manager.spawn();
