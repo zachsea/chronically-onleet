@@ -1,15 +1,30 @@
 import { LeetCode } from "leetcode-query";
-
-// implement caching or storage of questions later
+import type { Problem } from "leetcode-query";
+import { redis } from "../lib/redis-client.js";
 
 const leetcode = new LeetCode();
 
 export const getDailyProblem = async () => {
+  const todayUTC = new Date().toISOString().slice(0, 10);
+  const todayKey = `leetcode:daily:${todayUTC}`;
+  const cachedId = await redis.get<string>(todayKey);
+  if (cachedId) return getProblemByIdOrSlug(cachedId);
+  console.debug(`Daily for ${todayUTC} not cached, fetching...`);
+
   const dailyProblem = await leetcode.daily();
-  return dailyProblem;
+  if (!dailyProblem || dailyProblem.date !== todayUTC) return null;
+  console.debug(`Daily fetched successfully`);
+
+  await redis.set(todayKey, dailyProblem.question.titleSlug);
+  // this will technically fetch the problem twice the first, but it's not really a big deal
+  return getProblemByIdOrSlug(dailyProblem.question.titleSlug);
 };
 
 export const getProblemByIdOrSlug = async (idOrSlug: string) => {
+  const cacheKey = `leetcode:problem:${idOrSlug}`;
+  const cached = await redis.getJson<Problem>(cacheKey);
+  if (cached) return cached;
+
   let slug = idOrSlug;
   let problem = null;
   // if the input is a numeric frontend id, try searching for it
@@ -29,15 +44,25 @@ export const getProblemByIdOrSlug = async (idOrSlug: string) => {
       }
     }
   }
+
+  if (problem && (idOrSlug == problem.questionFrontendId || idOrSlug == problem.titleSlug)) {
+    // cache the problem under the provided input parameter forever
+    await redis.setJson(cacheKey, problem);
+  } else if (problem) {
+    // cache successful searches for 1 hour
+    await redis.setJson(cacheKey, problem, 60 * 60);
+  } else {
+    // cache failed searches for 5 minutes to prevent repeated API calls
+    await redis.setJson(cacheKey, null, 60 * 5);
+  }
   return problem;
 };
 
-/**
- * Search LeetCode by keyword and return the first question's titleSlug.
- * Uses the `problemsetQuestionListV2` GraphQL query but only requests the
- * `titleSlug` field from the results.
- */
 export const searchTitleSlugByKeyword = async (keyword: string): Promise<string | null> => {
+  const searchCacheKey = `leetcode:search:${keyword.toLowerCase()}`;
+  const cachedResult = await redis.getJson<string | null>(searchCacheKey);
+  if (cachedResult !== undefined) return cachedResult;
+
   const query = `
     query problemsetQuestionListV2($filters: QuestionFilterInput, $limit: Int, $searchKeyword: String, $skip: Int, $sortBy: QuestionSortByInput, $categorySlug: String) {
       problemsetQuestionListV2(
@@ -85,7 +110,14 @@ export const searchTitleSlugByKeyword = async (keyword: string): Promise<string 
       };
     };
   } = await leetcode.graphql({ query, variables });
-
+  console.log("Data", res.data);
   const questions = res.data?.problemsetQuestionListV2?.questions ?? [];
-  return questions.length > 0 ? (questions[0].titleSlug ?? null) : null;
+  const result = questions.length > 0 ? (questions[0].titleSlug ?? null) : null;
+
+  // Failed searches are less useful but prevent spam, successful can stay but we still
+  // don't want many of them hanging around for similar reasons... probably should use LRU
+  // or something else instead
+  await redis.setJson(searchCacheKey, result, result ? 60 * 30 : 60 * 5);
+
+  return result;
 };

@@ -1,5 +1,5 @@
 import TurndownService from "turndown";
-import toSuperscript from "../../utils/toSuperscript.js";
+import toSuperscript from "../../utils/to-superscript.js";
 
 export default function superscripts(turndownService: TurndownService) {
   turndownService.addRule("superscripts", {

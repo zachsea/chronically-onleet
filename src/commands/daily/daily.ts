@@ -22,7 +22,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     return;
   }
   // use the components to display the problem for now
-  const components = ProblemContainer(dailyProblem.question);
+  const components = ProblemContainer(dailyProblem);
   try {
     await interaction.editReply({ content: null, components, flags: MessageFlags.IsComponentsV2 });
   } catch (error) {
