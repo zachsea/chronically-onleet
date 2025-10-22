@@ -9,7 +9,7 @@ const GuildSchema = new mongoose.Schema(
       type: new mongoose.Schema({
         channelId: { type: String, default: null },
         useThreads: { type: Boolean, default: false },
-        config: { type: MessageConfigSchema, required: true },
+        config: { type: MessageConfigSchema, required: true, default: {} },
         useCompact: { type: Boolean, default: false },
         lastSuccessfulDelivery: { type: Date, default: null },
         lastAttemptedDelivery: { type: Date, default: null },

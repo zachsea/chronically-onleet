@@ -9,6 +9,7 @@ class GuildService {
     } catch (err) {
       console.error(`Failed to save new guild with id ${guildId}:`, err);
     }
+    return newGuild;
   }
 
   async getGuild(guildId: string) {
