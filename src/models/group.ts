@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose, { HydratedDocument, InferSchemaType } from "mongoose";
 import MessageConfigSchema from "./message-config.js";
 
 const GroupSchema = new mongoose.Schema(
@@ -23,5 +23,8 @@ const Group = mongoose.model("Group", GroupSchema);
 Group.createCollection().catch((err) => {
   console.error("Error creating Group collection:", err);
 });
+
+type GroupType = InferSchemaType<typeof GroupSchema>;
+export type GroupDocument = HydratedDocument<GroupType>;
 
 export default Group;

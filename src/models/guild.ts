@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose, { HydratedDocument, InferSchemaType } from "mongoose";
 import MessageConfigSchema from "./message-config.js";
 
 const GuildSchema = new mongoose.Schema(
@@ -25,5 +25,8 @@ const Guild = mongoose.model("Guild", GuildSchema);
 Guild.createCollection().catch((err) => {
   console.error("Error creating Guild collection:", err);
 });
+
+type GuildType = InferSchemaType<typeof GuildSchema>;
+export type GuildDocument = HydratedDocument<GuildType>;
 
 export default Guild;

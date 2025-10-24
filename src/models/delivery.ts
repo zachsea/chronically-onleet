@@ -1,10 +1,10 @@
-import mongoose from "mongoose";
+import mongoose, { HydratedDocument, InferSchemaType } from "mongoose";
 
 const DeliverySchema = new mongoose.Schema(
   {
     targetId: { type: String, required: true, index: true },
     targetType: { type: String, required: true, enum: ["user", "guild", "group"], index: true },
-    messageDate: { type: Date, required: true, index: true },
+    messageDate: { type: Date, index: true, required: false, default: null },
     scheduledDate: { type: Date, required: true, index: true },
     status: {
       type: String,
@@ -26,5 +26,8 @@ const Delivery = mongoose.model("Delivery", DeliverySchema);
 Delivery.createCollection().catch((err) => {
   console.error("Error creating Delivery collection:", err);
 });
+
+type DeliveryType = InferSchemaType<typeof DeliverySchema>;
+export type DeliveryDocument = HydratedDocument<DeliveryType>;
 
 export default Delivery;

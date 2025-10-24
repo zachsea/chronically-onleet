@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose, { HydratedDocument, InferSchemaType } from "mongoose";
 import MessageConfigSchema from "./message-config.js";
 
 const UserSchema = new mongoose.Schema(
@@ -31,5 +31,8 @@ const User = mongoose.model("User", UserSchema);
 User.createCollection().catch((err) => {
   console.error("Error creating User collection:", err);
 });
+
+type UserType = InferSchemaType<typeof UserSchema>;
+export type UserDocument = HydratedDocument<UserType>;
 
 export default User;
