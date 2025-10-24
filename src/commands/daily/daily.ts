@@ -18,7 +18,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   await interaction.reply({ content: "Fetching daily problem..." });
   const dailyProblem = await getDailyProblem();
   if (!dailyProblem) {
-    await interaction.editReply("Could not fetch the daily problem. Please try again later.");
+    await interaction.editReply(
+      "Could not fetch the daily problem (likely not quite out yet). Please try again later."
+    );
     return;
   }
   // use the components to display the problem for now

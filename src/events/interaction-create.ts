@@ -36,12 +36,7 @@ export async function execute(interaction: BaseInteraction) {
     }
   } else if (interaction.isButton()) {
     const handler = handlers.ButtonInteraction?.get(interaction.customId);
-    if (!handler) {
-      await interaction.reply({
-        content: "Sorry, there wasn't any handling logic for that button... seems like a bug!",
-        flags: MessageFlags.Ephemeral,
-      });
-    } else {
+    if (handler) {
       try {
         await handler.execute(interaction);
       } catch (error) {
