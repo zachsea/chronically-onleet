@@ -1,10 +1,15 @@
 import {
   ActionRowBuilder,
   ButtonBuilder,
+  ButtonInteraction,
   ButtonStyle,
   ChannelSelectMenuBuilder,
+  ChannelSelectMenuInteraction,
+  ChannelType,
   ContainerBuilder,
+  InteractionContextType,
   MessageActionRowComponentBuilder,
+  MessageFlags,
   SectionBuilder,
   SeparatorBuilder,
   SeparatorSpacingSize,
@@ -13,12 +18,13 @@ import {
 import { GuildSettings } from "../../types/guild-settings.js";
 import ToggleButton from "../toggle-button.js";
 import SettingsLayout from "./settings-layout.js";
+import GuildService from "../../services/guild-service.js";
 
-interface ServerSettingsProps {
+interface DailyServerSettingsProps {
   settings: GuildSettings;
 }
 
-export function ServerSettings({ settings }: ServerSettingsProps) {
+export function DailyServerSettings({ settings }: DailyServerSettingsProps) {
   const dailySettings: ContainerBuilder[] = [
     new ContainerBuilder()
       .addTextDisplayComponents(new TextDisplayBuilder().setContent("### Daily Messages"))
@@ -45,6 +51,7 @@ export function ServerSettings({ settings }: ServerSettingsProps) {
         new ChannelSelectMenuBuilder()
           .setPlaceholder("Daily channel or forum...")
           .setCustomId("settings::guild-daily-select-channel")
+          .addChannelTypes([ChannelType.GuildText, ChannelType.GuildForum])
           .setDefaultChannels([settings.daily.channelId])
       )
     );
@@ -79,8 +86,8 @@ export function ServerSettings({ settings }: ServerSettingsProps) {
         .setButtonAccessory(
           ToggleButton({
             isEnabled: settings.daily.useCompact,
-            customIdEnable: "settings::daily-toggle-compact-enable",
-            customIdDisable: "settings::daily-toggle-compact-disable",
+            customIdEnable: "settings::guild-daily-toggle-compact-enable",
+            customIdDisable: "settings::guild-daily-toggle-compact-disable",
           })
         )
         .addTextDisplayComponents(
@@ -105,17 +112,58 @@ export function ServerSettings({ settings }: ServerSettingsProps) {
         )
     );
 
-  const buttons = [
-    new ButtonBuilder().setLabel("User Settings").setCustomId("settings::user-config"),
-    new ButtonBuilder().setLabel("Server Settings").setCustomId("settings::server-config"),
-  ];
-
   const components = SettingsLayout({
-    title: "Server Settings",
-    buttons,
-    currentPageButton: "settings::server-config",
     rows: dailySettings,
   });
 
   return components;
+}
+
+async function paintServerSettings(
+  interaction: ChannelSelectMenuInteraction | ButtonInteraction,
+  guildService: GuildService
+) {
+  if (!interaction.guildId) return;
+  const settings = await guildService.getGuildSettings(interaction.guildId);
+  await interaction.editReply({
+    components: DailyServerSettings({ settings }),
+    flags: MessageFlags.IsComponentsV2,
+  });
+}
+
+export async function DailyServerSettingsButtonHandling(interaction: ButtonInteraction, guildService: GuildService) {
+  if (!interaction.inGuild()) throw Error("Guild button handler called on non-guild interaction");
+  await interaction.deferUpdate();
+  const selection = interaction.customId;
+  if (selection == "settings::guild-daily-toggle-active-enable") {
+    await guildService.setDailyEnabled(interaction.guildId, true);
+  } else if (selection == "settings::guild-daily-toggle-active-disable") {
+    await guildService.setDailyEnabled(interaction.guildId, false);
+  } else if (selection == "settings::guild-daily-toggle-threads-enable") {
+    await guildService.setDailyThreadsEnabled(interaction.guildId, true);
+  } else if (selection == "settings::guild-daily-toggle-threads-disable") {
+    await guildService.setDailyThreadsEnabled(interaction.guildId, false);
+  } else if (selection == "settings::guild-daily-toggle-compact-enable") {
+    await guildService.setDailyCompactEnabled(interaction.guildId, true);
+  } else if (selection == "settings::guild-daily-toggle-compact-disable") {
+    await guildService.setDailyCompactEnabled(interaction.guildId, false);
+  }
+  // refresh
+  await paintServerSettings(interaction, guildService);
+}
+
+export async function DailyServerSettingsChannelHandling(
+  interaction: ChannelSelectMenuInteraction,
+  guildService: GuildService
+) {
+  await interaction.deferUpdate();
+  const selection = interaction.values[0];
+
+  if (interaction.context === InteractionContextType.Guild && interaction.guildId) {
+    if (selection) {
+      // add more validation logic here
+      await guildService.setDailyChannelId(interaction.guildId, selection);
+      await paintServerSettings(interaction, guildService);
+    }
+  }
 }

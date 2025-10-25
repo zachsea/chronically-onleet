@@ -1,21 +1,61 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, MessageFlags, InteractionContextType } from "discord.js";
+import {
+  SlashCommandBuilder,
+  ChatInputCommandInteraction,
+  MessageFlags,
+  InteractionContextType,
+  Interaction,
+  PermissionsBitField,
+  ComponentType,
+} from "discord.js";
 import { getDailyProblem } from "../../services/leetcode-service.js";
 import ProblemContainer from "../../components/leetcode/problem-container.js";
+import GuildService from "../../services/guild-service.js";
+import {
+  DailyServerSettings,
+  DailyServerSettingsButtonHandling,
+  DailyServerSettingsChannelHandling,
+} from "../../components/settings/daily-server-settings.js";
 
-// temp
+const DAILY_COMMAND = "daily";
+const DAILY_SEND_COMMAND = "send";
+const DAILY_SETTINGS_COMMAND = "settings";
+
+const guildService = new GuildService();
 
 export const data = new SlashCommandBuilder()
-  .setName("daily")
-  .setDescription("Get the daily LeetCode problem")
-  .addBooleanOption((option) =>
-    option.setName("compact").setDescription("Show a more compact version of the problem, overrides user preference")
+  .setName(DAILY_COMMAND)
+  .setDescription("Daily leetcode commands")
+  .addSubcommand((subCommand) =>
+    subCommand
+      .setName(DAILY_SEND_COMMAND)
+      .setDescription("Post the daily problem in chat")
+      .addBooleanOption((option) =>
+        option
+          .setName("compact")
+          .setDescription("Show a more compact version of the problem, overrides user preference")
+      )
+  )
+  .addSubcommand((subCommand) =>
+    subCommand.setName(DAILY_SETTINGS_COMMAND).setDescription("Settings related to automated daily posting")
   )
   .setContexts([InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel]);
 
 export async function execute(interaction: ChatInputCommandInteraction) {
-  console.log("Daily command invoked");
-  // fetch daily problem from leetcode service
-  await interaction.reply({ content: "Fetching daily problem..." });
+  const subCommand = interaction.options.getSubcommand(true);
+  if (subCommand === DAILY_SEND_COMMAND) {
+    await executeSend(interaction);
+  } else if (subCommand === DAILY_SETTINGS_COMMAND) {
+    await executeSettings(interaction);
+  } else {
+    console.error(`Subcommand ${subCommand} does not exist... somehow`);
+    await interaction.reply({
+      content: "You managed to somehow call a subcommand that doesn't exist... oops? Logged.",
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+}
+
+async function executeSend(interaction: ChatInputCommandInteraction) {
   const dailyProblem = await getDailyProblem();
   if (!dailyProblem) {
     await interaction.editReply(
@@ -30,4 +70,45 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   } catch (error) {
     console.error("Error editing reply:", error);
   }
+}
+
+async function executeSettings(interaction: ChatInputCommandInteraction) {
+  if (interaction.inGuild()) {
+    await postGuildSettings(interaction);
+  } else {
+    await interaction.reply("Not implemented");
+  }
+}
+
+async function postGuildSettings(interaction: ChatInputCommandInteraction) {
+  if (!interaction.inGuild()) throw Error("Guild settings called in non-guild");
+  const response = await interaction.deferReply({
+    withResponse: true,
+  });
+  const settings = await guildService.getGuildSettings(interaction.guildId);
+  await interaction.editReply({
+    components: DailyServerSettings({ settings }),
+    flags: MessageFlags.IsComponentsV2,
+  });
+  const interactionFilter = (i: Interaction) =>
+    i.memberPermissions?.has(PermissionsBitField.Flags.ManageGuild) ?? false;
+  const buttonCollector = response.resource?.message?.createMessageComponentCollector({
+    filter: interactionFilter,
+    componentType: ComponentType.Button,
+    time: 3600000, // 1 hour
+  });
+
+  const channelCollector = response.resource?.message?.createMessageComponentCollector({
+    filter: interactionFilter,
+    componentType: ComponentType.ChannelSelect,
+    time: 3600000, // 1 hour
+  });
+
+  buttonCollector?.on("collect", async (i) => {
+    await DailyServerSettingsButtonHandling(i, guildService);
+  });
+
+  channelCollector?.on("collect", async (i) => {
+    await DailyServerSettingsChannelHandling(i, guildService);
+  });
 }

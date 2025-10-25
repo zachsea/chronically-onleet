@@ -32,6 +32,7 @@ class GuildService {
       await guild.save();
     } catch (err) {
       console.error(`Failed to save daily.enabled for guild ${guildId}:`, err);
+      throw err;
     }
   }
 
@@ -49,6 +50,7 @@ class GuildService {
       await guild.save();
     } catch (err) {
       console.error(`Failed to save daily.offsetMinutes for guild ${guildId}:`, err);
+      throw err;
     }
   }
 
@@ -66,6 +68,7 @@ class GuildService {
       await guild.save();
     } catch (err) {
       console.error(`Failed to save daily.useThreads for guild ${guildId}:`, err);
+      throw err;
     }
   }
 
@@ -83,6 +86,7 @@ class GuildService {
       await guild.save();
     } catch (err) {
       console.error(`Failed to save daily.channelId for guild ${guildId}:`, err);
+      throw err;
     }
   }
 
@@ -100,6 +104,7 @@ class GuildService {
       await guild.save();
     } catch (err) {
       console.error(`Failed to save daily.useCompact for guild ${guildId}:`, err);
+      throw err;
     }
   }
 

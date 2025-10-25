@@ -11,8 +11,6 @@ const GuildSchema = new mongoose.Schema(
         useThreads: { type: Boolean, default: false },
         config: { type: MessageConfigSchema, required: true, default: {} },
         useCompact: { type: Boolean, default: false },
-        lastSuccessfulDelivery: { type: Date, default: null },
-        lastAttemptedDelivery: { type: Date, default: null },
       }),
       required: true,
       default: {},

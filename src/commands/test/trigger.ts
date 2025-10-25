@@ -4,7 +4,7 @@ import Delivery from "../../models/delivery.js";
 export const data = new SlashCommandBuilder()
   .setName("trigger")
   .setDescription("Trigger a context (zach only)")
-  .addStringOption((option) => option.setName("context_id").setDescription("context").setRequired(true))
+  .addStringOption((option) => option.setName("context_id").setDescription("context").setRequired(false))
   .setContexts([InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel]);
 
 export async function execute(interaction: ChatInputCommandInteraction) {

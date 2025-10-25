@@ -7,20 +7,11 @@ const UserSchema = new mongoose.Schema(
     // daily problem settings and fault tolerance, reoccurs
     daily: {
       type: new mongoose.Schema({
-        config: { type: MessageConfigSchema, required: true },
+        config: { type: MessageConfigSchema, required: true, default: {} },
         useCompact: { type: Boolean, default: false },
-        lastSuccessfulDelivery: { type: Date, default: null },
-        lastAttemptedDelivery: { type: Date, default: null },
       }),
       required: true,
       default: {},
-    },
-    // user is allowed one additional daily reminder, manually set
-    reminder: {
-      config: MessageConfigSchema,
-      useCompact: { type: Boolean, default: false },
-      lastSuccessfulDelivery: { type: Date, default: null },
-      lastAttemptedDelivery: { type: Date, default: null },
     },
     useCompact: { type: Boolean, default: false },
   },

@@ -9,8 +9,6 @@ const GroupSchema = new mongoose.Schema(
       type: new mongoose.Schema({
         config: { type: MessageConfigSchema, required: true },
         useCompact: { type: Boolean, default: false },
-        lastSuccessfulDelivery: { type: Date, default: null },
-        lastAttemptedDelivery: { type: Date, default: null },
       }),
       required: true,
       default: {},
