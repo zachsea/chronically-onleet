@@ -1,12 +1,12 @@
 import { ChatInputCommandInteraction, InteractionContextType, MessageFlags, SlashCommandBuilder } from "discord.js";
-import { getProblemByIdOrSlug } from "../../services/leetcode-service.js";
+import { getProblemByQuery } from "../../services/leetcode-service.js";
 import ProblemContainer from "../../components/leetcode/problem-container.js";
 
 export const data = new SlashCommandBuilder()
   .setName("problem")
   .setDescription("Fetch a specific problem by its ID, slug, or keyword")
   .addStringOption((option) =>
-    option.setName("query").setDescription("The ID, slug, or keyword of the problem to fetch").setRequired(true)
+    option.setName("query").setDescription("The ID, slug, keyword, or URL of the problem to fetch").setRequired(true)
   )
   .addBooleanOption((option) =>
     option.setName("compact").setDescription("Show a more compact version of the problem, overrides user preference")
@@ -18,7 +18,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   await interaction.reply({ content: `Fetching problem ${problemId}...` });
 
-  const problem = await getProblemByIdOrSlug(problemId);
+  const problem = await getProblemByQuery(problemId);
   if (!problem) {
     await interaction.editReply(`Could not find problem with query "${problemId}". Please try again.`);
     return;

@@ -87,7 +87,7 @@ class MessageService {
     }
   }
 
-  private async sendToGuild(guild: GuildDocument, daily: Problem) {
+  async sendToGuild(guild: GuildDocument, problem: Problem) {
     if (!guild.daily.channelId) {
       throw new Error("Somehow, daily was scheduled without a channel id to send to");
     }
@@ -95,21 +95,21 @@ class MessageService {
     const useThreads = guild.daily.useThreads ?? false;
 
     const messageContentForum = {
-      name: `${daily.questionFrontendId}. ${daily.title} - ${new Date().toLocaleDateString("en-US", {
+      name: `${problem.questionFrontendId}. ${problem.title} - ${new Date().toLocaleDateString("en-US", {
         month: "long",
         day: "numeric",
         year: "numeric",
         timeZone: "UTC",
       })}`,
       message: {
-        components: DailyForumPost(daily),
+        components: DailyForumPost(problem),
         flags: MessageFlags.IsComponentsV2,
       },
       reason: `Daily for ${new Date().toISOString().slice(0, 10)}`,
     } as const;
 
     const messageContent = {
-      components: ProblemContainer(daily),
+      components: ProblemContainer(problem),
       flags: MessageFlags.IsComponentsV2,
     } as const;
 
@@ -158,14 +158,14 @@ class MessageService {
     }
   }
 
-  private async sendToUser(user: UserDocument, daily: Problem) {
+  async sendToUser(user: UserDocument, problem: Problem) {
     if (!user.userId) {
       throw new Error("Somehow, daily was scheduled without a user id to send to");
     }
     const userId = user.userId;
 
     const messageContent = {
-      components: ProblemContainer(daily),
+      components: ProblemContainer(problem),
       flags: MessageFlags.IsComponentsV2,
     } as const;
 

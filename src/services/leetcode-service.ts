@@ -8,7 +8,7 @@ export const getDailyProblem = async () => {
   const todayUTC = new Date().toISOString().slice(0, 10);
   const todayKey = `leetcode:daily:${todayUTC}`;
   const cachedId = await redis.get<string>(todayKey);
-  if (cachedId) return getProblemByIdOrSlug(cachedId);
+  if (cachedId) return getProblemByQuery(cachedId);
   console.debug(`Daily for ${todayUTC} not cached, fetching...`);
 
   const dailyProblem = await leetcode.daily();
@@ -17,17 +17,20 @@ export const getDailyProblem = async () => {
 
   await redis.set(todayKey, dailyProblem.question.titleSlug);
   // this will technically fetch the problem twice the first, but it's not really a big deal
-  return getProblemByIdOrSlug(dailyProblem.question.titleSlug);
+  return getProblemByQuery(dailyProblem.question.titleSlug);
 };
 
-export const getProblemByIdOrSlug = async (idOrSlug: string) => {
+export const getProblemByQuery = async (idOrSlug: string) => {
+  // if it's a URL grab the slug
+  const parsedSlug = parseSlugFromURL(idOrSlug);
+  if (parsedSlug) idOrSlug = parsedSlug;
   const cacheKey = `leetcode:problem:${idOrSlug}`;
   const cached = await redis.getJson<Problem>(cacheKey);
   if (cached) return cached;
 
   let slug = idOrSlug;
   let problem = null;
-  // if the input is a numeric frontend id, try searching for it
+  // there's no direct call for frontend id
   if (/^\d+$/.test(idOrSlug)) {
     const titleSlug = await searchTitleSlugByKeyword(idOrSlug + ".");
     if (titleSlug) {
@@ -119,4 +122,20 @@ export const searchTitleSlugByKeyword = async (keyword: string): Promise<string 
   await redis.setJson(searchCacheKey, result, result ? 60 * 30 : 60 * 5);
 
   return result;
+};
+
+export const parseSlugFromURL = (url: string): string | null => {
+  try {
+    const urlObj = new URL(url);
+    const pathSegments = urlObj.pathname.split("/").filter(Boolean);
+
+    // Check if it's a valid LeetCode problems URL
+    if (pathSegments[0] === "problems" && pathSegments[1]) {
+      return pathSegments[1];
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
 };

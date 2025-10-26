@@ -31,8 +31,8 @@ export function DailyUserSettings({ settings }: DailyUserSettingsProps) {
     .setButtonAccessory(
       ToggleButton({
         isEnabled: settings.daily.config.enabled,
-        customIdEnable: "settings::user-daily-toggle-active-enable",
-        customIdDisable: "settings::user-daily-toggle-active-disable",
+        customIdEnable: "settings:user-daily-toggle-active-enable",
+        customIdDisable: "settings:user-daily-toggle-active-disable",
       })
     )
     .addTextDisplayComponents(
@@ -44,8 +44,8 @@ export function DailyUserSettings({ settings }: DailyUserSettingsProps) {
     .setButtonAccessory(
       ToggleButton({
         isEnabled: settings.daily.useCompact,
-        customIdEnable: "settings::user-daily-toggle-compact-enable",
-        customIdDisable: "settings::user-daily-toggle-compact-disable",
+        customIdEnable: "settings:user-daily-toggle-compact-enable",
+        customIdDisable: "settings:user-daily-toggle-compact-disable",
       })
     )
     .addTextDisplayComponents(
@@ -58,7 +58,7 @@ export function DailyUserSettings({ settings }: DailyUserSettingsProps) {
       new ButtonBuilder()
         .setStyle(ButtonStyle.Secondary)
         .setLabel("Launch")
-        .setCustomId("settings::user-daily-offset-modal")
+        .setCustomId("settings:user-daily-offset-modal")
     )
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent("**Configure Offset**"),
@@ -107,13 +107,13 @@ export async function DailyUserSettingsButtonHandling(interaction: ButtonInterac
   if (interaction.context != InteractionContextType.BotDM) throw Error("User button handler called on non-DM context");
   await interaction.deferUpdate();
   const selection = interaction.customId;
-  if (selection == "settings::user-daily-toggle-active-enable") {
+  if (selection == "settings:user-daily-toggle-active-enable") {
     await userService.setDailyEnabled(interaction.user.id, true);
-  } else if (selection == "settings::user-daily-toggle-active-disable") {
+  } else if (selection == "settings:user-daily-toggle-active-disable") {
     await userService.setDailyEnabled(interaction.user.id, false);
-  } else if (selection == "settings::user-daily-toggle-compact-enable") {
+  } else if (selection == "settings:user-daily-toggle-compact-enable") {
     await userService.setDailyCompactEnabled(interaction.user.id, true);
-  } else if (selection == "settings::user-daily-toggle-compact-disable") {
+  } else if (selection == "settings:user-daily-toggle-compact-disable") {
     await userService.setDailyCompactEnabled(interaction.user.id, false);
   }
   // refresh

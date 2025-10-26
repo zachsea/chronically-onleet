@@ -38,8 +38,8 @@ export function DailyServerSettings({ settings, interaction }: DailyServerSettin
     .setButtonAccessory(
       ToggleButton({
         isEnabled: settings.daily.config.enabled,
-        customIdEnable: "settings::guild-daily-toggle-active-enable",
-        customIdDisable: "settings::guild-daily-toggle-active-disable",
+        customIdEnable: "settings:guild-daily-toggle-active-enable",
+        customIdDisable: "settings:guild-daily-toggle-active-disable",
       })
     )
     .addTextDisplayComponents(
@@ -50,7 +50,7 @@ export function DailyServerSettings({ settings, interaction }: DailyServerSettin
   const dailyChannelRow = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
     new ChannelSelectMenuBuilder()
       .setPlaceholder("Daily channel or forum...")
-      .setCustomId("settings::guild-daily-select-channel")
+      .setCustomId("settings:guild-daily-select-channel")
       .addChannelTypes([ChannelType.GuildText, ChannelType.GuildForum])
       .setDefaultChannels([settings.daily.channelId])
   );
@@ -84,8 +84,8 @@ export function DailyServerSettings({ settings, interaction }: DailyServerSettin
     .setButtonAccessory(
       ToggleButton({
         isEnabled: settings.daily.useThreads,
-        customIdEnable: "settings::guild-daily-toggle-threads-enable",
-        customIdDisable: "settings::guild-daily-toggle-threads-disable",
+        customIdEnable: "settings:guild-daily-toggle-threads-enable",
+        customIdDisable: "settings:guild-daily-toggle-threads-disable",
       })
     )
     .addTextDisplayComponents(
@@ -113,8 +113,8 @@ export function DailyServerSettings({ settings, interaction }: DailyServerSettin
     .setButtonAccessory(
       ToggleButton({
         isEnabled: settings.daily.useCompact,
-        customIdEnable: "settings::guild-daily-toggle-compact-enable",
-        customIdDisable: "settings::guild-daily-toggle-compact-disable",
+        customIdEnable: "settings:guild-daily-toggle-compact-enable",
+        customIdDisable: "settings:guild-daily-toggle-compact-disable",
       })
     )
     .addTextDisplayComponents(
@@ -127,7 +127,7 @@ export function DailyServerSettings({ settings, interaction }: DailyServerSettin
       new ButtonBuilder()
         .setStyle(ButtonStyle.Secondary)
         .setLabel("Launch")
-        .setCustomId("settings::guild-daily-offset-modal")
+        .setCustomId("settings:guild-daily-offset-modal")
     )
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent("**Configure Offset**"),
@@ -196,17 +196,17 @@ export async function DailyServerSettingsButtonHandling(interaction: ButtonInter
   if (!interaction.inGuild()) throw Error("Guild button handler called on non-guild interaction");
   await interaction.deferUpdate();
   const selection = interaction.customId;
-  if (selection == "settings::guild-daily-toggle-active-enable") {
+  if (selection == "settings:guild-daily-toggle-active-enable") {
     await guildService.setDailyEnabled(interaction.guildId, true);
-  } else if (selection == "settings::guild-daily-toggle-active-disable") {
+  } else if (selection == "settings:guild-daily-toggle-active-disable") {
     await guildService.setDailyEnabled(interaction.guildId, false);
-  } else if (selection == "settings::guild-daily-toggle-threads-enable") {
+  } else if (selection == "settings:guild-daily-toggle-threads-enable") {
     await guildService.setDailyThreadsEnabled(interaction.guildId, true);
-  } else if (selection == "settings::guild-daily-toggle-threads-disable") {
+  } else if (selection == "settings:guild-daily-toggle-threads-disable") {
     await guildService.setDailyThreadsEnabled(interaction.guildId, false);
-  } else if (selection == "settings::guild-daily-toggle-compact-enable") {
+  } else if (selection == "settings:guild-daily-toggle-compact-enable") {
     await guildService.setDailyCompactEnabled(interaction.guildId, true);
-  } else if (selection == "settings::guild-daily-toggle-compact-disable") {
+  } else if (selection == "settings:guild-daily-toggle-compact-disable") {
     await guildService.setDailyCompactEnabled(interaction.guildId, false);
   }
   // refresh
