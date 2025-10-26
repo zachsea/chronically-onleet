@@ -8,8 +8,6 @@ export const data = new SlashCommandBuilder()
   .setContexts([InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel]);
 
 export async function execute(interaction: ChatInputCommandInteraction) {
-  // console.log("Setup command invoked");
-  // await interaction.reply("Setup command is under development.");
   const turndownService = new TurndownService();
   turndownService.use(leetcodeTurndown);
   await interaction.reply(

@@ -1,92 +1,121 @@
 import {
   ButtonBuilder,
+  ButtonInteraction,
   ButtonStyle,
+  ChannelSelectMenuInteraction,
   ContainerBuilder,
+  Interaction,
+  InteractionContextType,
+  MessageFlags,
   SectionBuilder,
   SeparatorBuilder,
   SeparatorSpacingSize,
   TextDisplayBuilder,
 } from "discord.js";
-import SettingsLayout from "./settings-layout.js";
-import ToggleButton from "../toggle-button.js";
 import { UserSettings } from "../../types/user-settings.js";
+import ToggleButton from "../toggle-button.js";
+import SettingsLayout from "./settings-layout.js";
+import UserService from "../../services/user-service.js";
 
 interface DailyUserSettingsProps {
   settings: UserSettings;
+  interaction?: Interaction;
 }
 
 export function DailyUserSettings({ settings }: DailyUserSettingsProps) {
-  const dailySettings: ContainerBuilder[] = [
-    new ContainerBuilder()
-      .addTextDisplayComponents(new TextDisplayBuilder().setContent("### Messages"))
-      .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large).setDivider(true))
-      .addSectionComponents(
-        new SectionBuilder()
-          .setButtonAccessory(
-            ToggleButton({
-              isEnabled: settings.daily.config.enabled,
-              customIdEnable: "settings::user-toggle-compact-enable",
-              customIdDisable: "settings::user-toggle-compact-disable",
-            })
-          )
-          .addTextDisplayComponents(
-            new TextDisplayBuilder().setContent("**Post compact problems**"),
-            new TextDisplayBuilder().setContent("Default to using compact when posting problems")
-          )
-      )
-      .addTextDisplayComponents(new TextDisplayBuilder().setContent("### Daily Messages"))
-      .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large).setDivider(true))
-      .addSectionComponents(
-        new SectionBuilder()
-          .setButtonAccessory(
-            ToggleButton({
-              isEnabled: settings.daily.config.enabled,
-              customIdEnable: "settings::user-daily-toggle-active-enable",
-              customIdDisable: "settings::user-daily-toggle-active-disable",
-            })
-          )
-          .addTextDisplayComponents(
-            new TextDisplayBuilder().setContent("**Post daily challenges**"),
-            new TextDisplayBuilder().setContent("Send a message for each daily leetcode challenge")
-          )
-      ),
-  ];
+  let mainContainer = new ContainerBuilder().addTextDisplayComponents(
+    new TextDisplayBuilder().setContent("### Daily Messages")
+  );
 
-  dailySettings[0]
-    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large).setDivider(true))
-    .addSectionComponents(
-      new SectionBuilder()
-        .setButtonAccessory(
-          ToggleButton({
-            isEnabled: settings.daily.useCompact,
-            customIdEnable: "settings::user-daily-toggle-compact-enable",
-            customIdDisable: "settings::user-daily-toggle-compact-disable",
-          })
-        )
-        .addTextDisplayComponents(
-          new TextDisplayBuilder().setContent("**Post compact message**"),
-          new TextDisplayBuilder().setContent("Significantly cuts down the description size of the daily problem post")
-        )
+  const dailyToggleRow = new SectionBuilder()
+    .setButtonAccessory(
+      ToggleButton({
+        isEnabled: settings.daily.config.enabled,
+        customIdEnable: "settings::user-daily-toggle-active-enable",
+        customIdDisable: "settings::user-daily-toggle-active-disable",
+      })
     )
-    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large).setDivider(true))
-    .addSectionComponents(
-      new SectionBuilder()
-        .setButtonAccessory(
-          new ButtonBuilder()
-            .setStyle(ButtonStyle.Secondary)
-            .setLabel("Launch")
-            .setCustomId("settings::user-daily-offset-modal")
-        )
-        .addTextDisplayComponents(
-          new TextDisplayBuilder().setContent("**Configure Offset**"),
-          new TextDisplayBuilder().setContent(
-            "Opens modal for configuring the daily post time offset.\nCurrently set to `+1:00` from release"
-          )
-        )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent("**Post daily challenges**"),
+      new TextDisplayBuilder().setContent("Send a message for each daily leetcode challenge")
     );
 
+  const dailyCompactRow = new SectionBuilder()
+    .setButtonAccessory(
+      ToggleButton({
+        isEnabled: settings.daily.useCompact,
+        customIdEnable: "settings::user-daily-toggle-compact-enable",
+        customIdDisable: "settings::user-daily-toggle-compact-disable",
+      })
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent("**Post compact message**"),
+      new TextDisplayBuilder().setContent("Significantly cuts down the description size of the daily problem post")
+    );
+
+  const dailyOffsetRow = new SectionBuilder()
+    .setButtonAccessory(
+      new ButtonBuilder()
+        .setStyle(ButtonStyle.Secondary)
+        .setLabel("Launch")
+        .setCustomId("settings::user-daily-offset-modal")
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent("**Configure Offset**"),
+      new TextDisplayBuilder().setContent(
+        "Opens modal for configuring the daily post time offset.\nCurrently set to `+1:00` from release"
+      )
+    );
+
+  // piecing the embed together
+
+  mainContainer = mainContainer
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large).setDivider(true))
+    .addSectionComponents(dailyToggleRow);
+
+  // no reason to show anything daily related if its disabled
+
+  if (settings.daily.config.enabled) {
+    mainContainer = mainContainer
+      .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large).setDivider(true))
+      .addSectionComponents(dailyCompactRow);
+
+    mainContainer = mainContainer
+      .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large).setDivider(true))
+      .addSectionComponents(dailyOffsetRow);
+  }
+
   const components = SettingsLayout({
-    rows: dailySettings,
+    rows: [mainContainer],
   });
+
   return components;
+}
+
+async function paintUserSettings(
+  interaction: ChannelSelectMenuInteraction | ButtonInteraction,
+  userService: UserService
+) {
+  const settings = await userService.getUserSettings(interaction.user.id);
+  await interaction.editReply({
+    components: DailyUserSettings({ settings, interaction }),
+    flags: MessageFlags.IsComponentsV2,
+  });
+}
+
+export async function DailyUserSettingsButtonHandling(interaction: ButtonInteraction, userService: UserService) {
+  if (interaction.context != InteractionContextType.BotDM) throw Error("User button handler called on non-DM context");
+  await interaction.deferUpdate();
+  const selection = interaction.customId;
+  if (selection == "settings::user-daily-toggle-active-enable") {
+    await userService.setDailyEnabled(interaction.user.id, true);
+  } else if (selection == "settings::user-daily-toggle-active-disable") {
+    await userService.setDailyEnabled(interaction.user.id, false);
+  } else if (selection == "settings::user-daily-toggle-compact-enable") {
+    await userService.setDailyCompactEnabled(interaction.user.id, true);
+  } else if (selection == "settings::user-daily-toggle-compact-disable") {
+    await userService.setDailyCompactEnabled(interaction.user.id, false);
+  }
+  // refresh
+  await paintUserSettings(interaction, userService);
 }

@@ -13,7 +13,5 @@ export const data = new SlashCommandBuilder()
   .setContexts([InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel]);
 
 export async function execute(interaction: ChatInputCommandInteraction) {
-  console.log("Reminder command invoked");
-  console.log(`Subcommand: ${interaction.options.getSubcommand()}`);
   await interaction.reply("Reminder command is under development.");
 }

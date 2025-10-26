@@ -13,13 +13,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     return;
   }
   const newDelivery = new Delivery({
-    targetId: interaction.guildId ?? interaction.channelId,
-    targetType:
-      interaction.context == InteractionContextType.Guild
-        ? "guild"
-        : interaction.context == InteractionContextType.BotDM
-          ? "user"
-          : "group",
+    targetId: interaction.inGuild() ? interaction.guildId : interaction.user.id,
+    targetType: interaction.context == InteractionContextType.Guild ? "guild" : "user",
     scheduledDate: Date.now(),
   });
   await newDelivery.save();

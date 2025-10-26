@@ -110,7 +110,6 @@ export const searchTitleSlugByKeyword = async (keyword: string): Promise<string 
       };
     };
   } = await leetcode.graphql({ query, variables });
-  console.log("Data", res.data);
   const questions = res.data?.problemsetQuestionListV2?.questions ?? [];
   const result = questions.length > 0 ? (questions[0].titleSlug ?? null) : null;
 

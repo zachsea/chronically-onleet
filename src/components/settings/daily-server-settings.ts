@@ -7,9 +7,11 @@ import {
   ChannelSelectMenuInteraction,
   ChannelType,
   ContainerBuilder,
+  Interaction,
   InteractionContextType,
   MessageActionRowComponentBuilder,
   MessageFlags,
+  PermissionFlagsBits,
   SectionBuilder,
   SeparatorBuilder,
   SeparatorSpacingSize,
@@ -22,98 +24,157 @@ import GuildService from "../../services/guild-service.js";
 
 interface DailyServerSettingsProps {
   settings: GuildSettings;
+  interaction: Interaction;
 }
 
-export function DailyServerSettings({ settings }: DailyServerSettingsProps) {
-  const dailySettings: ContainerBuilder[] = [
-    new ContainerBuilder()
-      .addTextDisplayComponents(new TextDisplayBuilder().setContent("### Daily Messages"))
-      .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large).setDivider(true))
-      .addSectionComponents(
-        new SectionBuilder()
-          .setButtonAccessory(
-            ToggleButton({
-              isEnabled: settings.daily.config.enabled,
-              customIdEnable: "settings::guild-daily-toggle-active-enable",
-              customIdDisable: "settings::guild-daily-toggle-active-disable",
-            })
-          )
-          .addTextDisplayComponents(
-            new TextDisplayBuilder().setContent("**Post daily challenges**"),
-            new TextDisplayBuilder().setContent("Send a message for each daily leetcode challenge")
-          )
-      ),
-  ];
+export function DailyServerSettings({ settings, interaction }: DailyServerSettingsProps) {
+  const selectedChannel = interaction.guild?.channels.cache.get(settings.daily.channelId);
 
-  if (settings.daily.config.enabled) {
-    dailySettings[0].addActionRowComponents(
-      new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-        new ChannelSelectMenuBuilder()
-          .setPlaceholder("Daily channel or forum...")
-          .setCustomId("settings::guild-daily-select-channel")
-          .addChannelTypes([ChannelType.GuildText, ChannelType.GuildForum])
-          .setDefaultChannels([settings.daily.channelId])
+  let mainContainer = new ContainerBuilder().addTextDisplayComponents(
+    new TextDisplayBuilder().setContent("### Daily Messages")
+  );
+
+  const dailyToggleRow = new SectionBuilder()
+    .setButtonAccessory(
+      ToggleButton({
+        isEnabled: settings.daily.config.enabled,
+        customIdEnable: "settings::guild-daily-toggle-active-enable",
+        customIdDisable: "settings::guild-daily-toggle-active-disable",
+      })
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent("**Post daily challenges**"),
+      new TextDisplayBuilder().setContent("Send a message for each daily leetcode challenge")
+    );
+
+  const dailyChannelRow = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+    new ChannelSelectMenuBuilder()
+      .setPlaceholder("Daily channel or forum...")
+      .setCustomId("settings::guild-daily-select-channel")
+      .addChannelTypes([ChannelType.GuildText, ChannelType.GuildForum])
+      .setDefaultChannels([settings.daily.channelId])
+  );
+
+  let dailyChannelWarningRow: TextDisplayBuilder | null = null;
+
+  // check for unselected channel or insufficient permissions
+  if (!selectedChannel) {
+    dailyChannelWarningRow = new TextDisplayBuilder().setContent(
+      `**A channel must be selected before dailies will be sent!**`
+    );
+  } else {
+    const canSendMsg = selectedChannel?.permissionsFor(interaction.client.user)?.has(PermissionFlagsBits.SendMessages);
+    const canViewCnl = selectedChannel?.permissionsFor(interaction.client.user)?.has(PermissionFlagsBits.ViewChannel);
+    if (!canViewCnl) {
+      dailyChannelWarningRow = new TextDisplayBuilder().setContent(`**I don't have permission to view that channel!**`);
+    } else if (!canSendMsg) {
+      if (selectedChannel.type === ChannelType.GuildForum) {
+        dailyChannelWarningRow = new TextDisplayBuilder().setContent(
+          `**I don't have permission to make posts there!**\nMake sure I have the \`Send Messages\` permission`
+        );
+      } else {
+        dailyChannelWarningRow = new TextDisplayBuilder().setContent(
+          `**I don't have permissions to send messages there!**\nMake sure I have the \`Send Messages\` permission`
+        );
+      }
+    }
+  }
+
+  const dailyThreadRow = new SectionBuilder()
+    .setButtonAccessory(
+      ToggleButton({
+        isEnabled: settings.daily.useThreads,
+        customIdEnable: "settings::guild-daily-toggle-threads-enable",
+        customIdDisable: "settings::guild-daily-toggle-threads-disable",
+      })
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent("**Use threads**"),
+      new TextDisplayBuilder().setContent(
+        "To use a forum, select it from the above dropdown.\nThis option is ignored for forums"
       )
     );
-  }
-  if (settings.daily.config.enabled && !settings.daily.channelId) {
-    dailySettings[0].addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(`\\*A channel must be selected before dailies will be sent!`)
-    );
+
+  let dailyThreadWarningRow: TextDisplayBuilder | null = null;
+
+  if (selectedChannel) {
+    const canCreateThread = selectedChannel
+      ?.permissionsFor(interaction.client.user)
+      ?.has(PermissionFlagsBits.CreatePublicThreads);
+
+    if (!canCreateThread) {
+      dailyThreadWarningRow = new TextDisplayBuilder().setContent(
+        `**I don't have permission to create threads in the selected channel!**\nMake sure I have the \`Created Public Threads\` permission there`
+      );
+    }
   }
 
-  dailySettings[0]
-    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large).setDivider(true))
-    .addSectionComponents(
-      new SectionBuilder()
-        .setButtonAccessory(
-          ToggleButton({
-            isEnabled: settings.daily.useThreads,
-            customIdEnable: "settings::guild-daily-toggle-threads-enable",
-            customIdDisable: "settings::guild-daily-toggle-threads-disable",
-          })
-        )
-        .addTextDisplayComponents(
-          new TextDisplayBuilder().setContent("**Use threads**"),
-          new TextDisplayBuilder().setContent(
-            "To use a forum, select it from the above dropdown.\nThis option is ignored for forums"
-          )
-        )
+  const dailyCompactRow = new SectionBuilder()
+    .setButtonAccessory(
+      ToggleButton({
+        isEnabled: settings.daily.useCompact,
+        customIdEnable: "settings::guild-daily-toggle-compact-enable",
+        customIdDisable: "settings::guild-daily-toggle-compact-disable",
+      })
     )
-    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large).setDivider(true))
-    .addSectionComponents(
-      new SectionBuilder()
-        .setButtonAccessory(
-          ToggleButton({
-            isEnabled: settings.daily.useCompact,
-            customIdEnable: "settings::guild-daily-toggle-compact-enable",
-            customIdDisable: "settings::guild-daily-toggle-compact-disable",
-          })
-        )
-        .addTextDisplayComponents(
-          new TextDisplayBuilder().setContent("**Post compact message**"),
-          new TextDisplayBuilder().setContent("Significantly cuts down the description size of the daily problem post")
-        )
-    )
-    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large).setDivider(true))
-    .addSectionComponents(
-      new SectionBuilder()
-        .setButtonAccessory(
-          new ButtonBuilder()
-            .setStyle(ButtonStyle.Secondary)
-            .setLabel("Launch")
-            .setCustomId("settings::guild-daily-offset-modal")
-        )
-        .addTextDisplayComponents(
-          new TextDisplayBuilder().setContent("**Configure Offset**"),
-          new TextDisplayBuilder().setContent(
-            "Opens modal for configuring the daily post time offset.\nCurrently set to `+1:00` from release"
-          )
-        )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent("**Post compact message**"),
+      new TextDisplayBuilder().setContent("Significantly cuts down the description size of the daily problem post")
     );
+
+  const dailyOffsetRow = new SectionBuilder()
+    .setButtonAccessory(
+      new ButtonBuilder()
+        .setStyle(ButtonStyle.Secondary)
+        .setLabel("Launch")
+        .setCustomId("settings::guild-daily-offset-modal")
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent("**Configure Offset**"),
+      new TextDisplayBuilder().setContent(
+        "Opens modal for configuring the daily post time offset.\nCurrently set to `+1:00` from release"
+      )
+    );
+
+  // piecing the embed together
+
+  mainContainer = mainContainer
+    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large).setDivider(true))
+    .addSectionComponents(dailyToggleRow);
+
+  // no reason to show anything daily related if its disabled
+
+  if (settings.daily.config.enabled) {
+    mainContainer = mainContainer
+      .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large).setDivider(true))
+      .addActionRowComponents(dailyChannelRow);
+
+    if (dailyChannelWarningRow) {
+      mainContainer = mainContainer.addTextDisplayComponents(dailyChannelWarningRow);
+    }
+
+    // don't show thread option for forum channels
+    if (!(selectedChannel && selectedChannel.type === ChannelType.GuildForum)) {
+      mainContainer = mainContainer
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large).setDivider(true))
+        .addSectionComponents(dailyThreadRow);
+
+      if (dailyThreadWarningRow) {
+        mainContainer = mainContainer.addTextDisplayComponents(dailyThreadWarningRow);
+      }
+    }
+
+    mainContainer = mainContainer
+      .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large).setDivider(true))
+      .addSectionComponents(dailyCompactRow);
+
+    mainContainer = mainContainer
+      .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large).setDivider(true))
+      .addSectionComponents(dailyOffsetRow);
+  }
 
   const components = SettingsLayout({
-    rows: dailySettings,
+    rows: [mainContainer],
   });
 
   return components;
@@ -126,7 +187,7 @@ async function paintServerSettings(
   if (!interaction.guildId) return;
   const settings = await guildService.getGuildSettings(interaction.guildId);
   await interaction.editReply({
-    components: DailyServerSettings({ settings }),
+    components: DailyServerSettings({ settings, interaction }),
     flags: MessageFlags.IsComponentsV2,
   });
 }

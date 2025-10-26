@@ -3,7 +3,6 @@ import mongoose from "mongoose";
 import Delivery, { DeliveryDocument } from "../models/delivery.js";
 import Guild, { GuildDocument } from "../models/guild.js";
 import User, { UserDocument } from "../models/user.js";
-import Group, { GroupDocument } from "../models/group.js";
 import { getDailyProblem } from "./leetcode-service.js";
 import DailyForumPost from "../components/leetcode/daily-forum-post.js";
 import { Problem } from "leetcode-query";
@@ -70,6 +69,9 @@ class MessageService {
           console.debug(`Delivery to ${delivery.targetId} failed`);
         }
       }
+
+      // we need to chill so discord doesn't get mad
+      await new Promise((resolve) => setTimeout(resolve, 250));
     });
   }
 
@@ -77,18 +79,11 @@ class MessageService {
     if (delivery.targetType == "guild") {
       const guild = await Guild.findOne({ guildId: delivery.targetId });
       if (!guild) throw Error(`Guild ${delivery.targetId} not found`);
-
       await this.sendToGuild(guild, daily);
     } else if (delivery.targetType == "user") {
-      const user = await User.findOne({ guildId: delivery.targetId });
+      const user = await User.findOne({ userId: delivery.targetId });
       if (!user) throw Error(`User ${delivery.targetId} not found`);
-
       await this.sendToUser(user, daily);
-    } else if (delivery.targetType == "group") {
-      const group = await Group.findOne({ groupId: delivery.targetId });
-      if (!group) throw Error(`User ${delivery.targetId} not found`);
-
-      await this.sendToGroup(group, daily);
     }
   }
 
@@ -163,12 +158,38 @@ class MessageService {
     }
   }
 
-  private async sendToUser(_user: UserDocument, _daily: Problem) {
-    throw Error("Not implemented");
-  }
+  private async sendToUser(user: UserDocument, daily: Problem) {
+    if (!user.userId) {
+      throw new Error("Somehow, daily was scheduled without a user id to send to");
+    }
+    const userId = user.userId;
 
-  private async sendToGroup(_group: GroupDocument, _daily: Problem) {
-    throw Error("Not implemented");
+    const messageContent = {
+      components: ProblemContainer(daily),
+      flags: MessageFlags.IsComponentsV2,
+    } as const;
+
+    const result = await this.manager.broadcastEval(
+      async (bot, context) => {
+        const user = bot.users.cache.get(context.userId);
+        if (user) {
+          await user.send(context.messageContent);
+          return { success: true, shardId: bot.shard?.ids?.[0] ?? null };
+        }
+
+        return null;
+      },
+      { context: { userId, ChannelType, messageContent } }
+    );
+
+    const successfulShard = result.find((r) => r !== null);
+
+    if (successfulShard) {
+      console.info(`Message sent via shard ${successfulShard.shardId}`);
+    } else {
+      console.error(`User ${userId} not found in any shard`);
+      throw Error("No shard sent a successful message for the delivery");
+    }
   }
 }
 

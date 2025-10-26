@@ -15,12 +15,16 @@ import {
   DailyServerSettingsButtonHandling,
   DailyServerSettingsChannelHandling,
 } from "../../components/settings/daily-server-settings.js";
+import UserService from "../../services/user-service.js";
+import { DailyUserSettings, DailyUserSettingsButtonHandling } from "../../components/settings/daily-user-settings.js";
+import { isOnlyUserInstalled } from "../../utils/discord.js";
 
 const DAILY_COMMAND = "daily";
 const DAILY_SEND_COMMAND = "send";
 const DAILY_SETTINGS_COMMAND = "settings";
 
 const guildService = new GuildService();
+const userService = new UserService();
 
 export const data = new SlashCommandBuilder()
   .setName(DAILY_COMMAND)
@@ -56,6 +60,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 }
 
 async function executeSend(interaction: ChatInputCommandInteraction) {
+  await interaction.deferReply();
   const dailyProblem = await getDailyProblem();
   if (!dailyProblem) {
     await interaction.editReply(
@@ -74,9 +79,30 @@ async function executeSend(interaction: ChatInputCommandInteraction) {
 
 async function executeSettings(interaction: ChatInputCommandInteraction) {
   if (interaction.inGuild()) {
-    await postGuildSettings(interaction);
+    if (isOnlyUserInstalled(interaction)) {
+      await interaction.reply({
+        content:
+          "You must install the application to this guild to post dailies, this command was ran from a user installed context.\n**If you wish to have dailies in your DMs, run this command from a DM with the bot**",
+        flags: MessageFlags.Ephemeral,
+      });
+    } else {
+      // permission check
+      if (!interaction.memberPermissions.has(PermissionsBitField.Flags.ManageGuild)) {
+        await interaction.reply({
+          content: "You must have the `Manage Server` permission to use this command in this context",
+          flags: MessageFlags.Ephemeral,
+        });
+      } else {
+        await postGuildSettings(interaction);
+      }
+    }
+  } else if (interaction.context == InteractionContextType.BotDM) {
+    await postUserSettings(interaction);
   } else {
-    await interaction.reply("Not implemented");
+    await interaction.reply({
+      content: `This context is not supported. Daily messages can be configured in the following locations:\n- Servers\n- The bot's DM ${interaction.client.user.toString()} (either share a server or install me in your user for this!)`,
+      flags: MessageFlags.Ephemeral,
+    });
   }
 }
 
@@ -87,7 +113,7 @@ async function postGuildSettings(interaction: ChatInputCommandInteraction) {
   });
   const settings = await guildService.getGuildSettings(interaction.guildId);
   await interaction.editReply({
-    components: DailyServerSettings({ settings }),
+    components: DailyServerSettings({ settings, interaction }),
     flags: MessageFlags.IsComponentsV2,
   });
   const interactionFilter = (i: Interaction) =>
@@ -105,10 +131,47 @@ async function postGuildSettings(interaction: ChatInputCommandInteraction) {
   });
 
   buttonCollector?.on("collect", async (i) => {
-    await DailyServerSettingsButtonHandling(i, guildService);
+    try {
+      await DailyServerSettingsButtonHandling(i, guildService);
+    } catch (error) {
+      console.error(error);
+      await i.followUp({
+        content: "There was an unexpected error for that interaction, sorry!",
+        flags: MessageFlags.Ephemeral,
+      });
+    }
   });
 
   channelCollector?.on("collect", async (i) => {
-    await DailyServerSettingsChannelHandling(i, guildService);
+    try {
+      await DailyServerSettingsChannelHandling(i, guildService);
+    } catch (error) {
+      console.error(error);
+      await i.followUp({
+        content: "There was an unexpected error for that interaction, sorry!",
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+  });
+}
+
+async function postUserSettings(interaction: ChatInputCommandInteraction) {
+  if (interaction.context != InteractionContextType.BotDM) throw Error("User button handler called on non-DM context");
+  const response = await interaction.deferReply({
+    withResponse: true,
+  });
+  const settings = await userService.getUserSettings(interaction.user.id);
+  await interaction.editReply({
+    components: DailyUserSettings({ settings, interaction }),
+    flags: MessageFlags.IsComponentsV2,
+  });
+
+  const buttonCollector = response.resource?.message?.createMessageComponentCollector({
+    componentType: ComponentType.Button,
+    time: 3600000, // 1 hour
+  });
+
+  buttonCollector?.on("collect", async (i) => {
+    await DailyUserSettingsButtonHandling(i, userService);
   });
 }

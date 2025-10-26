@@ -3,7 +3,7 @@ import mongoose, { HydratedDocument, InferSchemaType } from "mongoose";
 const DeliverySchema = new mongoose.Schema(
   {
     targetId: { type: String, required: true, index: true },
-    targetType: { type: String, required: true, enum: ["user", "guild", "group"], index: true },
+    targetType: { type: String, required: true, enum: ["user", "guild"], index: true },
     messageDate: { type: Date, index: true, required: false, default: null },
     scheduledDate: { type: Date, required: true, index: true },
     status: {

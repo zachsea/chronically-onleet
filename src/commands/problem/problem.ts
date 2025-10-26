@@ -38,8 +38,6 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     return;
   }
 
-  console.log("Problem fetched:", problem.content);
-
   const components = ProblemContainer(problem);
   try {
     await interaction.editReply({ content: null, components, flags: MessageFlags.IsComponentsV2 });
