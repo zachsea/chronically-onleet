@@ -29,7 +29,7 @@ const addHTMLContent = (content: string) => {
   return components;
 };
 
-export default function DailyForumPost(problem: Problem) {
+export default function ProblemForumPost(problem: Problem) {
   const transformedContent = turndownService.turndown(problem.content);
   const content = addHTMLContent(transformedContent);
 

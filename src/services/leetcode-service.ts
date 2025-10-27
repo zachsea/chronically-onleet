@@ -30,8 +30,9 @@ export const getProblemByQuery = async (idOrSlug: string) => {
 
   let slug = idOrSlug;
   let problem = null;
+  const isNumericQuery = /^\d+$/.test(idOrSlug);
   // there's no direct call for frontend id
-  if (/^\d+$/.test(idOrSlug)) {
+  if (isNumericQuery) {
     const titleSlug = await searchTitleSlugByKeyword(idOrSlug + ".");
     if (titleSlug) {
       slug = titleSlug;
@@ -48,12 +49,21 @@ export const getProblemByQuery = async (idOrSlug: string) => {
     }
   }
 
-  if (problem && (idOrSlug == problem.questionFrontendId || idOrSlug == problem.titleSlug)) {
-    // cache the problem under the provided input parameter forever
-    await redis.setJson(cacheKey, problem);
-  } else if (problem) {
-    // cache successful searches for 1 hour
-    await redis.setJson(cacheKey, problem, 60 * 60);
+  if (problem) {
+    const isExactMatch = idOrSlug == problem.questionFrontendId || idOrSlug == problem.titleSlug;
+    const ttl = isExactMatch ? undefined : 60 * 60;
+
+    // always cache by the original query
+    await redis.setJson(cacheKey, problem, ttl);
+
+    // also cache by the other identifier
+    if (isNumericQuery && problem.titleSlug && problem.titleSlug !== idOrSlug) {
+      // searched by ID, also cache by slug
+      await redis.setJson(`leetcode:problem:${problem.titleSlug}`, problem, ttl);
+    } else if (!isNumericQuery && problem.questionFrontendId && problem.questionFrontendId !== idOrSlug) {
+      // searched by slug, also cache by frontend ID
+      await redis.setJson(`leetcode:problem:${problem.questionFrontendId}`, problem, ttl);
+    }
   } else {
     // cache failed searches for 5 minutes to prevent repeated API calls
     await redis.setJson(cacheKey, null, 60 * 5);
@@ -63,8 +73,10 @@ export const getProblemByQuery = async (idOrSlug: string) => {
 
 export const searchTitleSlugByKeyword = async (keyword: string): Promise<string | null> => {
   const searchCacheKey = `leetcode:search:${keyword.toLowerCase()}`;
-  const cachedResult = await redis.getJson<string | null>(searchCacheKey);
-  if (cachedResult !== undefined) return cachedResult;
+  const exists = await redis.exists(searchCacheKey);
+  if (exists) {
+    return await redis.getJson<string | null>(searchCacheKey);
+  }
 
   const query = `
     query problemsetQuestionListV2($filters: QuestionFilterInput, $limit: Int, $searchKeyword: String, $skip: Int, $sortBy: QuestionSortByInput, $categorySlug: String) {

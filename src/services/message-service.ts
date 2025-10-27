@@ -1,15 +1,22 @@
+// services/message-service.ts
 import { ChannelType, MessageFlags, ShardingManager, TextChannel } from "discord.js";
 import mongoose from "mongoose";
 import Delivery, { DeliveryDocument } from "../models/delivery.js";
 import Guild, { GuildDocument } from "../models/guild.js";
 import User, { UserDocument } from "../models/user.js";
 import { getDailyProblem } from "./leetcode-service.js";
-import DailyForumPost from "../components/leetcode/daily-forum-post.js";
+import ProblemForumPost from "../components/leetcode/problem-forum-post.js";
 import { Problem } from "leetcode-query";
 import ProblemContainer from "../components/leetcode/problem-container.js";
 
 interface MessageServiceOptions {
   pollIntervalMs?: number;
+}
+
+interface SendProblemOptions {
+  channelId: string;
+  useThreads?: boolean;
+  threadName?: string;
 }
 
 class MessageService {
@@ -91,8 +98,25 @@ class MessageService {
     if (!guild.daily.channelId) {
       throw new Error("Somehow, daily was scheduled without a channel id to send to");
     }
-    const channelId = guild.daily.channelId;
-    const useThreads = guild.daily.useThreads ?? false;
+
+    await this.sendProblemToChannel(
+      {
+        channelId: guild.daily.channelId,
+        useThreads: guild.daily.useThreads ?? false,
+      },
+      problem
+    );
+  }
+
+  async sendProblemToChannel(options: SendProblemOptions, problem: Problem) {
+    const { channelId, useThreads = false, threadName } = options;
+
+    const defaultThreadName = `Daily LeetCode Problem ${new Date().toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+      timeZone: "UTC",
+    })}`;
 
     const messageContentForum = {
       name: `${problem.questionFrontendId}. ${problem.title} - ${new Date().toLocaleDateString("en-US", {
@@ -102,7 +126,7 @@ class MessageService {
         timeZone: "UTC",
       })}`,
       message: {
-        components: DailyForumPost(problem),
+        components: ProblemForumPost(problem),
         flags: MessageFlags.IsComponentsV2,
       },
       reason: `Daily for ${new Date().toISOString().slice(0, 10)}`,
@@ -131,12 +155,7 @@ class MessageService {
           const message = await (channel as TextChannel).send(context.messageContent);
           if (context.useThreads) {
             const thread = await message.startThread({
-              name: `Daily LeetCode Problem ${new Date().toLocaleDateString("en-US", {
-                month: "long",
-                day: "numeric",
-                year: "numeric",
-                timeZone: "UTC",
-              })}`,
+              name: context.threadName || context.defaultThreadName,
             });
             await thread.send("Use this thread to discuss the problem and share your solutions.");
           }
@@ -145,7 +164,17 @@ class MessageService {
 
         return null;
       },
-      { context: { channelId, useThreads, ChannelType, messageContentForum, messageContent } }
+      {
+        context: {
+          channelId,
+          useThreads,
+          threadName,
+          defaultThreadName,
+          ChannelType,
+          messageContentForum,
+          messageContent,
+        },
+      }
     );
 
     const successfulShard = result.find((r) => r !== null);
