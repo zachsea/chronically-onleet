@@ -64,7 +64,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
 export async function executePost(interaction: ChatInputCommandInteraction) {
   const problemQuery = interaction.options.getString("query", true);
-  const useCompact = interaction.options.getBoolean("compact", false);
+  const useCompact = interaction.options.getBoolean("compact", false) ?? false;
 
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
@@ -146,6 +146,7 @@ export async function executePost(interaction: ChatInputCommandInteraction) {
         useThreads: true,
         threadName: `${problem.questionFrontendId}. ${problem.title} - Discussion`,
         blame: interaction.user,
+        useCompact,
       },
       problem
     );
@@ -161,7 +162,7 @@ export async function executePost(interaction: ChatInputCommandInteraction) {
 
 export async function executeSend(interaction: ChatInputCommandInteraction) {
   const problemQuery = interaction.options.getString("query", true);
-  const useCompact = interaction.options.getBoolean("compact", false);
+  const useCompact = interaction.options.getBoolean("compact", false) ?? false;
 
   await interaction.deferReply();
 
@@ -185,7 +186,7 @@ export async function executeSend(interaction: ChatInputCommandInteraction) {
     return;
   }
 
-  const components = ProblemContainer(problem);
+  const components = ProblemContainer(problem, useCompact);
   await interaction.editReply({
     content: null,
     components,

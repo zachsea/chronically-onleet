@@ -1,22 +1,16 @@
 // services/message-service.ts
-import { ChannelType, MessageFlags, ShardingManager, TextChannel } from "discord.js";
+import { ChannelType, MessageFlags, ShardingManager } from "discord.js";
 import mongoose from "mongoose";
 import Delivery, { DeliveryDocument } from "../models/delivery.js";
 import Guild, { GuildDocument } from "../models/guild.js";
 import User, { UserDocument } from "../models/user.js";
 import { getDailyProblem } from "./leetcode-service.js";
-import ProblemForumPost from "../components/leetcode/problem-forum-post.js";
 import { Problem } from "leetcode-query";
 import ProblemContainer from "../components/leetcode/problem-container.js";
+import { SendProblemOptions } from "./problem-sender.js";
 
 interface MessageServiceOptions {
   pollIntervalMs?: number;
-}
-
-interface SendProblemOptions {
-  channelId: string;
-  useThreads?: boolean;
-  threadName?: string;
 }
 
 class MessageService {
@@ -98,91 +92,48 @@ class MessageService {
     if (!guild.daily.channelId) {
       throw new Error("Somehow, daily was scheduled without a channel id to send to");
     }
+    const options: SendProblemOptions = {
+      channelId: guild.daily.channelId,
+      useThreads: guild.daily.useThreads,
+      useCompact: guild.daily.useCompact,
+    };
 
-    await this.sendProblemToChannel(
-      {
-        channelId: guild.daily.channelId,
-        useThreads: guild.daily.useThreads ?? false,
-      },
-      problem
-    );
-  }
-
-  async sendProblemToChannel(options: SendProblemOptions, problem: Problem) {
-    const { channelId, useThreads = false, threadName } = options;
-
-    const defaultThreadName = `Daily LeetCode Problem ${new Date().toLocaleDateString("en-US", {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-      timeZone: "UTC",
-    })}`;
-
-    const messageContentForum = {
-      name: `${problem.questionFrontendId}. ${problem.title} - ${new Date().toLocaleDateString("en-US", {
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-        timeZone: "UTC",
-      })}`,
-      message: {
-        components: ProblemForumPost(problem),
-        flags: MessageFlags.IsComponentsV2,
-      },
-      reason: `Daily for ${new Date().toISOString().slice(0, 10)}`,
-    } as const;
-
-    const messageContent = {
-      components: ProblemContainer(problem),
-      flags: MessageFlags.IsComponentsV2,
-    } as const;
+    // get the absolute path to the module
+    const { fileURLToPath } = await import("url");
+    const path = await import("path");
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+    const problemSenderPath = path.join(__dirname, "./problem-sender.js");
 
     const result = await this.manager.broadcastEval(
       async (bot, context) => {
-        const channel = bot.channels.cache.get(context.channelId);
-
-        // Create forum post if selected context is a forum
-        if (channel && channel.type == context.ChannelType.GuildForum) {
-          await channel.threads.create({
-            name: context.messageContentForum.name,
-            message: context.messageContentForum.message,
-            reason: context.messageContentForum.reason,
-          });
+        try {
+          /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
+          const { sendProblemToChannel } = await import(context.problemSenderPath);
+          await sendProblemToChannel(bot, context.options, context.problem);
+          /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
           return { success: true, shardId: bot.shard?.ids?.[0] ?? null };
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          return { success: false, error: errorMessage, shardId: bot.shard?.ids?.[0] ?? null };
         }
-        // Send the raw message in the channel, and follow up with a thread if desired
-        if (channel) {
-          const message = await (channel as TextChannel).send(context.messageContent);
-          if (context.useThreads) {
-            const thread = await message.startThread({
-              name: context.threadName || context.defaultThreadName,
-            });
-            await thread.send("Use this thread to discuss the problem and share your solutions.");
-          }
-          return { success: true, shardId: bot.shard?.ids?.[0] ?? null };
-        }
-
-        return null;
       },
       {
-        context: {
-          channelId,
-          useThreads,
-          threadName,
-          defaultThreadName,
-          ChannelType,
-          messageContentForum,
-          messageContent,
-        },
+        context: { problem, options, problemSenderPath },
       }
     );
 
-    const successfulShard = result.find((r) => r !== null);
+    const successfulShard = result.find((r) => r?.success === true);
 
     if (successfulShard) {
       console.info(`Message sent via shard ${successfulShard.shardId}`);
     } else {
-      console.error(`Channel ${channelId} not found in any shard`);
+      const errors = result.filter((r) => r?.success === false);
+      errors.forEach((err) => {
+        console.error(`Shard ${err.shardId} error: ${err.error}`);
+      });
+
+      console.error(`Channel ${options.channelId} not found in any shard`);
       throw Error("No shard sent a successful message for the delivery");
     }
   }
@@ -194,7 +145,7 @@ class MessageService {
     const userId = user.userId;
 
     const messageContent = {
-      components: ProblemContainer(problem),
+      components: ProblemContainer(problem, user.daily.useCompact),
       flags: MessageFlags.IsComponentsV2,
     } as const;
 

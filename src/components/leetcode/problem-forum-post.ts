@@ -29,13 +29,14 @@ const addHTMLContent = (content: string) => {
   return components;
 };
 
-export default function ProblemForumPost(problem: Problem) {
+export default function ProblemForumPost(problem: Problem, useCompact = false) {
   const transformedContent = turndownService.turndown(problem.content);
-  const content = addHTMLContent(transformedContent);
+  let content: (MediaGalleryBuilder | TextDisplayBuilder)[] = [];
 
-  // spread the content array so we return top-level builders instead of
-  // a nested array (prevents the TypeScript type error about
-  // '(MediaGalleryBuilder | TextDisplayBuilder)[]' not being assignable)
+  if (!useCompact) {
+    content = addHTMLContent(transformedContent);
+  }
+
   return [
     ...content,
     new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large).setDivider(true),

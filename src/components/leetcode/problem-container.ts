@@ -30,30 +30,33 @@ const addHTMLContent = (parentBuilder: ContainerBuilder, content: string) => {
   }, parentBuilder);
 };
 
-export default function ProblemContainer(problem: Problem) {
+export default function ProblemContainer(problem: Problem, useCompact = false) {
   const transformedContent = turndownService.turndown(problem.content);
-  let contentContainer = new ContainerBuilder()
-    .addSectionComponents(
-      new SectionBuilder()
-        .setButtonAccessory(
-          new ButtonBuilder()
-            .setStyle(
-              problem.difficulty === "Easy"
-                ? ButtonStyle.Success
-                : problem.difficulty === "Medium"
-                  ? ButtonStyle.Primary
-                  : ButtonStyle.Danger
-            )
-            .setLabel(problem.difficulty ?? "Unknown")
-            .setCustomId("difficulty:level")
-        )
-        .addTextDisplayComponents(
-          new TextDisplayBuilder().setContent(`# ${problem.questionFrontendId}\\. ${problem.title}`)
-        )
-    )
-    .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large).setDivider(true));
+  let contentContainer = new ContainerBuilder().addSectionComponents(
+    new SectionBuilder()
+      .setButtonAccessory(
+        new ButtonBuilder()
+          .setStyle(
+            problem.difficulty === "Easy"
+              ? ButtonStyle.Success
+              : problem.difficulty === "Medium"
+                ? ButtonStyle.Primary
+                : ButtonStyle.Danger
+          )
+          .setLabel(problem.difficulty ?? "Unknown")
+          .setCustomId("difficulty:level")
+      )
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(`# ${problem.questionFrontendId}\\. ${problem.title}`)
+      )
+  );
 
-  contentContainer = addHTMLContent(contentContainer, transformedContent);
+  if (!useCompact) {
+    contentContainer.addSeparatorComponents(
+      new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large).setDivider(true)
+    );
+    contentContainer = addHTMLContent(contentContainer, transformedContent);
+  }
 
   return [
     contentContainer,

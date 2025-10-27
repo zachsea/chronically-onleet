@@ -12,15 +12,16 @@ import { Problem } from "leetcode-query";
 import ProblemForumPost from "../components/leetcode/problem-forum-post.js";
 import ProblemContainer from "../components/leetcode/problem-container.js";
 
-interface SendProblemOptions {
+export interface SendProblemOptions {
   channelId: string;
   useThreads?: boolean;
   threadName?: string;
   blame?: User;
+  useCompact?: boolean;
 }
 
 export async function sendProblemToChannel(client: Client, options: SendProblemOptions, problem: Problem) {
-  const { channelId, useThreads = false, threadName, blame } = options;
+  const { channelId, useThreads = false, threadName, blame, useCompact = false } = options;
 
   const defaultThreadName = `Daily LeetCode Problem ${new Date().toLocaleDateString("en-US", {
     month: "long",
@@ -37,10 +38,10 @@ export async function sendProblemToChannel(client: Client, options: SendProblemO
 
   // create forum post if selected context is a forum
   if (channel.type === ChannelType.GuildForum) {
-    let components = ProblemForumPost(problem);
+    let components = ProblemForumPost(problem, useCompact);
     // add a "blame" field if available
-    if (options.blame) {
-      const blameField = new TextDisplayBuilder({ content: `Posted by ${options.blame.toString()}` });
+    if (blame) {
+      const blameField = new TextDisplayBuilder({ content: `Posted by ${blame.toString()}` });
       components = [
         blameField,
         new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large).setDivider(true),
@@ -69,7 +70,7 @@ export async function sendProblemToChannel(client: Client, options: SendProblemO
 
   // send the raw message in the channel, and follow up with a thread if desired
   const messageContent = {
-    components: ProblemContainer(problem),
+    components: ProblemContainer(problem, useCompact),
     flags: MessageFlags.IsComponentsV2,
   } as const;
 
