@@ -31,15 +31,15 @@ const addHTMLContent = (content: string) => {
 
 export default function ProblemForumPost(problem: Problem, useCompact = false) {
   const transformedContent = turndownService.turndown(problem.content);
-  let content: (MediaGalleryBuilder | TextDisplayBuilder)[] = [];
+  let content: (MediaGalleryBuilder | TextDisplayBuilder | SeparatorBuilder)[] = [];
 
   if (!useCompact) {
     content = addHTMLContent(transformedContent);
+    content.push(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large).setDivider(true));
   }
 
   return [
     ...content,
-    new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large).setDivider(true),
     new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
         .setLabel("Open Problem")

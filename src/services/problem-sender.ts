@@ -54,7 +54,7 @@ export async function sendProblemToChannel(client: Client, options: SendProblemO
       year: "numeric",
       timeZone: "UTC",
     });
-    const titleSuffix = options.blame ? "" : ` ${dateString}`;
+    const titleSuffix = options.blame ? "" : ` - /t${dateString}`;
     const messageContentForum = {
       name: `${problem.questionFrontendId}. ${problem.title}${titleSuffix}`,
       message: {
