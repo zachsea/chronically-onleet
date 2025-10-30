@@ -16,6 +16,7 @@ import { UserSettings } from "../../types/user-settings.js";
 import ToggleButton from "../toggle-button.js";
 import SettingsLayout from "./settings-layout.js";
 import UserService from "../../services/user-service.js";
+import formatOffset from "../../utils/formatOffset.js";
 
 interface DailyUserSettingsProps {
   settings: UserSettings;
@@ -63,7 +64,7 @@ export function DailyUserSettings({ settings }: DailyUserSettingsProps) {
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent("**Configure Offset**"),
       new TextDisplayBuilder().setContent(
-        "Opens modal for configuring the daily post time offset.\nCurrently set to `+1:00` from release"
+        `Opens modal for configuring the daily post time offset.\nCurrently set to \`${formatOffset(settings.daily.config.offsetMinutes)}\` from release`
       )
     );
 
