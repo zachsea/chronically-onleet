@@ -206,31 +206,33 @@ export async function DailyServerSettingsButtonHandling(interaction: ButtonInter
     if (!interaction.inGuild()) return; // handle better
     if (!interaction.memberPermissions.has(PermissionFlagsBits.ManageGuild)) return; // handle better
 
+    const offsetMinutes = await guildService.getDailyOffsetMinutes(interaction.guildId);
+    const currentHours = Math.floor(offsetMinutes / 60);
+    const currentMinutes = Math.floor(offsetMinutes % 60);
+
     const modal = new ModalBuilder()
       .setCustomId(`modal:guild-daily-offset:${interaction.message.id}`)
       .setTitle("Daily Offset");
-    const hourLabel = new LabelBuilder()
-      .setLabel("Offset hour")
-      .setStringSelectMenuComponent(
-        new StringSelectMenuBuilder()
-          .setCustomId("select:daily-offset-hour")
-          .addOptions(
-            Array.from({ length: 23 }, (_, i) =>
-              new StringSelectMenuOptionBuilder().setLabel(String(i + 1)).setValue(String(i + 1))
-            )
-          )
-      );
-    const minuteLabel = new LabelBuilder()
-      .setLabel("Offset minute")
-      .setStringSelectMenuComponent(
-        new StringSelectMenuBuilder()
-          .setCustomId("select:daily-offset-minute")
-          .addOptions(
-            Array.from({ length: 12 }, (_, i) =>
-              new StringSelectMenuOptionBuilder().setLabel(String(i * 5)).setValue(String(i * 5))
-            )
-          )
-      );
+    const hourLabel = new LabelBuilder().setLabel("Offset hour").setStringSelectMenuComponent(
+      new StringSelectMenuBuilder().setCustomId("select:daily-offset-hour").addOptions(
+        Array.from({ length: 24 }, (_, i) =>
+          new StringSelectMenuOptionBuilder()
+            .setLabel(String(i).padStart(2, "0"))
+            .setValue(String(i))
+            .setDefault(i === currentHours)
+        )
+      )
+    );
+    const minuteLabel = new LabelBuilder().setLabel("Offset minute").setStringSelectMenuComponent(
+      new StringSelectMenuBuilder().setCustomId("select:daily-offset-minute").addOptions(
+        Array.from({ length: 12 }, (_, i) =>
+          new StringSelectMenuOptionBuilder()
+            .setLabel(String(i * 5).padStart(2, "0"))
+            .setValue(String(i * 5))
+            .setDefault(i === currentMinutes)
+        )
+      )
+    );
     modal.addLabelComponents(hourLabel, minuteLabel);
     await interaction.showModal(modal);
     return;

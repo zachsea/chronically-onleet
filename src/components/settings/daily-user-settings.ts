@@ -6,10 +6,14 @@ import {
   ContainerBuilder,
   Interaction,
   InteractionContextType,
+  LabelBuilder,
   MessageFlags,
+  ModalBuilder,
   SectionBuilder,
   SeparatorBuilder,
   SeparatorSpacingSize,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
   TextDisplayBuilder,
 } from "discord.js";
 import { UserSettings } from "../../types/user-settings.js";
@@ -106,8 +110,44 @@ async function paintUserSettings(
 
 export async function DailyUserSettingsButtonHandling(interaction: ButtonInteraction, userService: UserService) {
   if (interaction.context != InteractionContextType.BotDM) throw Error("User button handler called on non-DM context");
-  await interaction.deferUpdate();
   const selection = interaction.customId;
+  // check for modal calls before deferring!
+  if (selection == "settings:user-daily-offset-modal") {
+    // consider abstracting
+    if (interaction.inGuild()) return; // handle better
+
+    const offsetMinutes = await userService.getDailyOffsetMinutes(interaction.user.id);
+    const currentHours = Math.floor(offsetMinutes / 60);
+    const currentMinutes = Math.floor(offsetMinutes % 60);
+
+    const modal = new ModalBuilder()
+      .setCustomId(`modal:user-daily-offset:${interaction.message.id}`)
+      .setTitle("Daily Offset");
+    const hourLabel = new LabelBuilder().setLabel("Offset hour").setStringSelectMenuComponent(
+      new StringSelectMenuBuilder().setCustomId("select:daily-offset-hour").addOptions(
+        Array.from({ length: 24 }, (_, i) =>
+          new StringSelectMenuOptionBuilder()
+            .setLabel(String(i).padStart(2, "0"))
+            .setValue(String(i))
+            .setDefault(i == currentHours)
+        )
+      )
+    );
+    const minuteLabel = new LabelBuilder().setLabel("Offset minute").setStringSelectMenuComponent(
+      new StringSelectMenuBuilder().setCustomId("select:daily-offset-minute").addOptions(
+        Array.from({ length: 12 }, (_, i) =>
+          new StringSelectMenuOptionBuilder()
+            .setLabel(String(i * 5).padStart(2, "0"))
+            .setValue(String(i * 5))
+            .setDefault(i == currentMinutes)
+        )
+      )
+    );
+    modal.addLabelComponents(hourLabel, minuteLabel);
+    await interaction.showModal(modal);
+    return;
+  }
+  await interaction.deferUpdate();
   if (selection == "settings:user-daily-toggle-active-enable") {
     await userService.setDailyEnabled(interaction.user.id, true);
   } else if (selection == "settings:user-daily-toggle-active-disable") {
