@@ -9,18 +9,23 @@ import {
   ContainerBuilder,
   Interaction,
   InteractionContextType,
+  LabelBuilder,
   MessageActionRowComponentBuilder,
   MessageFlags,
+  ModalBuilder,
   PermissionFlagsBits,
   SectionBuilder,
   SeparatorBuilder,
   SeparatorSpacingSize,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
   TextDisplayBuilder,
 } from "discord.js";
 import { GuildSettings } from "../../types/guild-settings.js";
 import ToggleButton from "../toggle-button.js";
 import SettingsLayout from "./settings-layout.js";
 import GuildService from "../../services/guild-service.js";
+import formatOffset from "../../utils/formatOffset.js";
 
 interface DailyServerSettingsProps {
   settings: GuildSettings;
@@ -132,7 +137,7 @@ export function DailyServerSettings({ settings, interaction }: DailyServerSettin
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent("**Configure Offset**"),
       new TextDisplayBuilder().setContent(
-        "Opens modal for configuring the daily post time offset.\nCurrently set to `+1:00` from release"
+        `Opens modal for configuring the daily post time offset.\nCurrently set to \`${formatOffset(settings.daily.config.offsetMinutes)}\` from release`
       )
     );
 
@@ -194,8 +199,44 @@ async function paintServerSettings(
 
 export async function DailyServerSettingsButtonHandling(interaction: ButtonInteraction, guildService: GuildService) {
   if (!interaction.inGuild()) throw Error("Guild button handler called on non-guild interaction");
-  await interaction.deferUpdate();
   const selection = interaction.customId;
+  // check for modal calls before deferring!
+  if (selection == "settings:guild-daily-offset-modal") {
+    // consider abstracting
+    if (!interaction.inGuild()) return; // handle better
+    if (!interaction.memberPermissions.has(PermissionFlagsBits.ManageGuild)) return; // handle better
+
+    const modal = new ModalBuilder()
+      .setCustomId(`modal:guild-daily-offset:${interaction.message.id}`)
+      .setTitle("Daily Offset");
+    const hourLabel = new LabelBuilder()
+      .setLabel("Offset hour")
+      .setStringSelectMenuComponent(
+        new StringSelectMenuBuilder()
+          .setCustomId("select:daily-offset-hour")
+          .addOptions(
+            Array.from({ length: 23 }, (_, i) =>
+              new StringSelectMenuOptionBuilder().setLabel(String(i + 1)).setValue(String(i + 1))
+            )
+          )
+      );
+    const minuteLabel = new LabelBuilder()
+      .setLabel("Offset minute")
+      .setStringSelectMenuComponent(
+        new StringSelectMenuBuilder()
+          .setCustomId("select:daily-offset-minute")
+          .addOptions(
+            Array.from({ length: 12 }, (_, i) =>
+              new StringSelectMenuOptionBuilder().setLabel(String(i * 5)).setValue(String(i * 5))
+            )
+          )
+      );
+    modal.addLabelComponents(hourLabel, minuteLabel);
+    await interaction.showModal(modal);
+    return;
+  }
+
+  await interaction.deferUpdate();
   if (selection == "settings:guild-daily-toggle-active-enable") {
     await guildService.setDailyEnabled(interaction.guildId, true);
   } else if (selection == "settings:guild-daily-toggle-active-disable") {

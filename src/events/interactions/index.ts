@@ -10,6 +10,7 @@ type InteractionModuleShape = {
 
 const interactionTypeMap: Record<string, string> = {
   buttons: "ButtonInteraction",
+  modals: "ModalSubmitInteraction",
 };
 
 function isInteractionModule(mod: unknown): mod is InteractionModuleShape {
