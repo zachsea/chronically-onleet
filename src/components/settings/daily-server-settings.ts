@@ -219,7 +219,7 @@ export async function DailyServerSettingsButtonHandling(interaction: ButtonInter
           new StringSelectMenuOptionBuilder()
             .setLabel(String(i).padStart(2, "0"))
             .setValue(String(i))
-            .setDefault(i === currentHours)
+            .setDefault(i == currentHours)
         )
       )
     );
@@ -229,7 +229,7 @@ export async function DailyServerSettingsButtonHandling(interaction: ButtonInter
           new StringSelectMenuOptionBuilder()
             .setLabel(String(i * 5).padStart(2, "0"))
             .setValue(String(i * 5))
-            .setDefault(i === currentMinutes)
+            .setDefault(i == currentMinutes)
         )
       )
     );
