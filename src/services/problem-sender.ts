@@ -30,7 +30,7 @@ export async function sendProblemToChannel(client: Client, options: SendProblemO
     timeZone: "UTC",
   })}`;
 
-  const channel = client.channels.cache.get(channelId);
+  const channel = await client.channels.fetch(channelId);
 
   if (!channel) {
     throw new Error(`Channel ${channelId} not found`);

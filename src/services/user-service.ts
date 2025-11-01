@@ -1,4 +1,5 @@
 import User from "../models/user.js";
+import Delivery from "../models/delivery.js";
 
 class UserService {
   async createUser(userId: string) {
@@ -52,6 +53,44 @@ class UserService {
     } catch (err) {
       console.error(`Failed to save daily.offsetMinutes for user ${userId}:`, err);
       throw err;
+    }
+
+    // align today's pending delivery if moving to a later time and it hasn't sent yet
+    try {
+      if (!user.daily.config.enabled) return;
+
+      const now = new Date();
+      const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+      const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60000);
+      const scheduledAt = new Date(dayStart.getTime() + minutes * 60000);
+
+      const existing = await Delivery.findOne({
+        targetId: userId,
+        targetType: "user",
+        scheduledDate: { $gte: dayStart, $lt: dayEnd },
+      });
+
+      if (!existing) {
+        // no delivery yet today, create one for today at new time
+        const when = scheduledAt <= now ? now : scheduledAt;
+        await Delivery.create({ targetId: userId, targetType: "user", scheduledDate: when, status: "pending" });
+        return;
+      }
+
+      if (existing.status === "pending") {
+        // if moved later and still in future, push forward
+        if (existing.scheduledDate < scheduledAt && now < scheduledAt) {
+          existing.scheduledDate = scheduledAt;
+          await existing.save();
+        }
+        // if moved earlier and new time already passed, pull to now for immediate send
+        else if (scheduledAt <= now && existing.scheduledDate > now) {
+          existing.scheduledDate = now;
+          await existing.save();
+        }
+      }
+    } catch (err) {
+      console.error(`Failed aligning today's delivery after user offset change (${userId}):`, err);
     }
   }
 

@@ -8,6 +8,7 @@ export const env = createEnv({
     MONGODB_URI: z.string().min(1),
     REDIS_URI: z.string().min(1).optional(),
     MESSAGE_POLL_SECONDS: z.int().min(1).optional().default(5),
+    SCHEDULE_POLL_SECONDS: z.int().min(1).optional().default(60),
   },
   emptyStringAsUndefined: true,
   runtimeEnvStrict: {
@@ -16,5 +17,6 @@ export const env = createEnv({
     MONGODB_URI: process.env.MONGODB_URI,
     REDIS_URI: process.env.REDIS_URI,
     MESSAGE_POLL_SECONDS: process.env.MESSAGE_POLL_SECONDS,
+    SCHEDULE_POLL_SECONDS: process.env.SCHEDULE_POLL_SECONDS,
   },
 });

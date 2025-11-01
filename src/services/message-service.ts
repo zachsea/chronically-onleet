@@ -151,7 +151,7 @@ class MessageService {
 
     const result = await this.manager.broadcastEval(
       async (bot, context) => {
-        const user = bot.users.cache.get(context.userId);
+        const user = await bot.users.fetch(context.userId);
         if (user) {
           await user.send(context.messageContent);
           return { success: true, shardId: bot.shard?.ids?.[0] ?? null };

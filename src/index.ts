@@ -4,6 +4,7 @@ import MessageService from "./services/message-service.js";
 import mongoose from "mongoose";
 import { redis } from "./lib/redis-client.js";
 import { env } from "./env.js";
+import ScheduleService from "./services/schedule-service.js";
 
 const botFile = path.join(new URL(".", import.meta.url).pathname, "bot.js");
 const manager = new ShardingManager(botFile);
@@ -40,4 +41,6 @@ await manager.spawn().then(async () => {
   await connectMongo();
   const messageService = new MessageService(manager, { pollIntervalMs: env.MESSAGE_POLL_SECONDS * 1000 });
   await messageService.start();
+  const scheduleService = new ScheduleService({ pollIntervalMs: env.SCHEDULE_POLL_SECONDS * 1000 });
+  await scheduleService.start();
 });

@@ -1,4 +1,5 @@
 import Guild from "../models/guild.js";
+import Delivery from "../models/delivery.js";
 
 class GuildService {
   async createGuild(guildId: string) {
@@ -51,6 +52,44 @@ class GuildService {
     } catch (err) {
       console.error(`Failed to save daily.offsetMinutes for guild ${guildId}:`, err);
       throw err;
+    }
+
+    // align today's pending delivery if moving to a later time and it hasn't sent yet
+    try {
+      if (!guild.daily.config.enabled) return;
+      if (!guild.daily.channelId) return;
+
+      const now = new Date();
+      const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+      const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60000);
+      const scheduledAt = new Date(dayStart.getTime() + minutes * 60000);
+
+      const existing = await Delivery.findOne({
+        targetId: guildId,
+        targetType: "guild",
+        scheduledDate: { $gte: dayStart, $lt: dayEnd },
+      });
+
+      if (!existing) {
+        // no delivery yet today, create one for today at new time
+        const when = scheduledAt <= now ? now : scheduledAt;
+        await Delivery.create({ targetId: guildId, targetType: "guild", scheduledDate: when, status: "pending" });
+        return;
+      }
+
+      if (existing.status === "pending") {
+        if (existing.scheduledDate < scheduledAt && now < scheduledAt) {
+          // moved later, push forward
+          existing.scheduledDate = scheduledAt;
+          await existing.save();
+        } else if (scheduledAt <= now && existing.scheduledDate > now) {
+          // moved earlier, pull to now for immediate send
+          existing.scheduledDate = now;
+          await existing.save();
+        }
+      }
+    } catch (err) {
+      console.error(`Failed aligning today's delivery after guild offset change (${guildId}):`, err);
     }
   }
 
