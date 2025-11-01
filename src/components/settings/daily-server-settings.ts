@@ -35,10 +35,55 @@ interface DailyServerSettingsProps {
 }
 
 export async function DailyServerSettings({ settings, interaction }: DailyServerSettingsProps) {
-  const selectedChannel = settings.daily.channelId
-    ? await interaction.guild?.channels.fetch(settings.daily.channelId)
-    : null;
-  const selectedRole = settings.daily.roleId ? await interaction.guild?.roles.fetch(settings.daily.roleId) : null;
+  let selectedChannel = null;
+  let selectedRole = null;
+  const guildService = new GuildService();
+
+  if (settings.daily.channelId) {
+    try {
+      selectedChannel = (await interaction.guild?.channels.fetch(settings.daily.channelId)) ?? null;
+      if (!selectedChannel) {
+        // channel doesn't exist, clear it from settings
+        try {
+          await guildService.clearDailyChannelId(interaction.guildId!);
+          delete (settings.daily as { channelId?: string }).channelId;
+        } catch (err) {
+          console.error(`Failed to clear invalid channelId for guild ${interaction.guildId}:`, err);
+        }
+      }
+    } catch {
+      // channel fetch failed (doesn't exist or no permission), clear it
+      try {
+        await guildService.clearDailyChannelId(interaction.guildId!);
+        delete (settings.daily as { channelId?: string }).channelId;
+      } catch (err) {
+        console.error(`Failed to clear invalid channelId for guild ${interaction.guildId}:`, err);
+      }
+    }
+  }
+
+  if (settings.daily.roleId) {
+    try {
+      selectedRole = (await interaction.guild?.roles.fetch(settings.daily.roleId)) ?? null;
+      if (!selectedRole) {
+        // role doesn't exist, clear it from settings
+        try {
+          await guildService.clearDailyRolePingId(interaction.guildId!);
+          delete (settings.daily as { roleId?: string }).roleId;
+        } catch (err) {
+          console.error(`Failed to clear invalid roleId for guild ${interaction.guildId}:`, err);
+        }
+      }
+    } catch {
+      // role fetch failed (doesn't exist), clear it
+      try {
+        await guildService.clearDailyRolePingId(interaction.guildId!);
+        delete (settings.daily as { roleId?: string }).roleId;
+      } catch (err) {
+        console.error(`Failed to clear invalid roleId for guild ${interaction.guildId}:`, err);
+      }
+    }
+  }
 
   let mainContainer = new ContainerBuilder().addTextDisplayComponents(
     new TextDisplayBuilder().setContent("### Daily Messages")
@@ -280,7 +325,7 @@ export async function DailyServerSettingsButtonHandling(interaction: ButtonInter
           new StringSelectMenuOptionBuilder()
             .setLabel(String(i * 5).padStart(2, "0"))
             .setValue(String(i * 5))
-            .setDefault(i == currentMinutes)
+            .setDefault(i * 5 == currentMinutes)
         )
       )
     );

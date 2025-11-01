@@ -8,6 +8,7 @@ import { getDailyProblem } from "./leetcode-service.js";
 import { Problem } from "leetcode-query";
 import ProblemContainer from "../components/leetcode/problem-container.js";
 import { SendProblemOptions } from "./problem-sender.js";
+import GuildService from "./guild-service.js";
 
 interface MessageServiceOptions {
   pollIntervalMs?: number;
@@ -16,10 +17,12 @@ interface MessageServiceOptions {
 class MessageService {
   manager: ShardingManager;
   options: MessageServiceOptions;
+  guildService: GuildService;
 
   constructor(manager: ShardingManager, options: MessageServiceOptions = {}) {
     this.manager = manager;
     this.options = options;
+    this.guildService = new GuildService();
     if (!mongoose.connection.readyState) {
       throw new Error("MongoDB is not connected");
     }
@@ -97,6 +100,7 @@ class MessageService {
       useThreads: guild.daily.useThreads,
       useCompact: guild.daily.useCompact,
       roleId: guild.daily.roleId,
+      isDaily: true,
     };
 
     // get the absolute path to the module
@@ -106,14 +110,32 @@ class MessageService {
     const __dirname = path.dirname(__filename);
     const problemSenderPath = path.join(__dirname, "./problem-sender.js");
 
-    const result = await this.manager.broadcastEval(
+    type BroadcastResult =
+      | { success: true; shardId: number | null; roleNotFound?: boolean }
+      | { success: false; error: string; shardId: number | null };
+
+    const result = (await this.manager.broadcastEval(
       async (bot, context) => {
         try {
           /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
           const { sendProblemToChannel } = await import(context.problemSenderPath);
           await sendProblemToChannel(bot, context.options, context.problem);
-          /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
-          return { success: true, shardId: bot.shard?.ids?.[0] ?? null };
+
+          // verify role still exists if roleId was provided
+          let roleNotFound = false;
+          if (context.options.roleId) {
+            try {
+              const channel = await bot.channels.fetch(context.options.channelId);
+              // Only check roles for guild channels (not DMs)
+              if (channel && "guild" in channel && channel.guild) {
+                await channel.guild.roles.fetch(context.options.roleId);
+              }
+            } catch {
+              roleNotFound = true;
+            }
+          }
+
+          return { success: true, shardId: bot.shard?.ids?.[0] ?? null, roleNotFound };
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
           return { success: false, error: errorMessage, shardId: bot.shard?.ids?.[0] ?? null };
@@ -122,19 +144,48 @@ class MessageService {
       {
         context: { problem, options, problemSenderPath },
       }
-    );
+    )) as BroadcastResult[];
 
-    const successfulShard = result.find((r) => r?.success === true);
+    const successfulShard = result.find((r): r is Extract<BroadcastResult, { success: true }> => r?.success === true);
 
     if (successfulShard) {
       console.info(`Message sent via shard ${successfulShard.shardId}`);
+
+      // check if role was not found and clear it if it was
+      if (successfulShard.roleNotFound && options.roleId) {
+        console.warn(`Role ${options.roleId} no longer exists for guild ${guild.guildId}, clearing roleId`);
+        try {
+          await this.guildService.clearDailyRolePingId(guild.guildId);
+        } catch (clearErr) {
+          console.error(`Failed to clear roleId for guild ${guild.guildId}:`, clearErr);
+        }
+      }
     } else {
       const errors = result.filter((r) => r?.success === false);
+
+      // check for channel not found errors and clear invalid channel ID if it was
+      let channelNotFound = false;
+
       errors.forEach((err) => {
         console.error(`Shard ${err.shardId} error: ${err.error}`);
+        if (err.error?.startsWith("CHANNEL_NOT_FOUND:")) {
+          channelNotFound = true;
+        }
       });
 
-      console.error(`Channel ${options.channelId} not found in any shard`);
+      // clear invalid channel ID
+      if (channelNotFound) {
+        console.warn(`Channel ${options.channelId} no longer exists for guild ${guild.guildId}, clearing channelId`);
+        try {
+          await this.guildService.clearDailyChannelId(guild.guildId);
+        } catch (clearErr) {
+          console.error(`Failed to clear channelId for guild ${guild.guildId}:`, clearErr);
+        }
+        console.error(`Channel ${options.channelId} not found in any shard`);
+        throw Error("No shard sent a successful message for the delivery");
+      }
+
+      console.error(`Failed to send message to guild ${guild.guildId}`);
       throw Error("No shard sent a successful message for the delivery");
     }
   }

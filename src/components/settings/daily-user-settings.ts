@@ -139,7 +139,7 @@ export async function DailyUserSettingsButtonHandling(interaction: ButtonInterac
           new StringSelectMenuOptionBuilder()
             .setLabel(String(i * 5).padStart(2, "0"))
             .setValue(String(i * 5))
-            .setDefault(i == currentMinutes)
+            .setDefault(i * 5 == currentMinutes)
         )
       )
     );

@@ -129,6 +129,18 @@ class GuildService {
     }
   }
 
+  async clearDailyChannelId(guildId: string) {
+    const guild = await this.getGuild(guildId);
+    if (!guild) throw Error("Guild not found");
+    delete (guild.daily as { channelId?: string }).channelId;
+    try {
+      await guild.save();
+    } catch (err) {
+      console.error(`Failed to clear daily.channelId for guild ${guildId}:`, err);
+      throw err;
+    }
+  }
+
   async getDailyRolePingEnabled(guildId: string) {
     const guild = await this.getGuild(guildId);
     if (!guild) throw Error("Guild not found");
@@ -161,6 +173,18 @@ class GuildService {
       await guild.save();
     } catch (err) {
       console.error(`Failed to save daily.roleId for guild ${guildId}:`, err);
+      throw err;
+    }
+  }
+
+  async clearDailyRolePingId(guildId: string) {
+    const guild = await this.getGuild(guildId);
+    if (!guild) throw Error("Guild not found");
+    delete (guild.daily as { roleId?: string }).roleId;
+    try {
+      await guild.save();
+    } catch (err) {
+      console.error(`Failed to clear daily.roleId for guild ${guildId}:`, err);
       throw err;
     }
   }
