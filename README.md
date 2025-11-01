@@ -1,1 +1,1 @@
-# daily-leet
+# chronically-onleet
