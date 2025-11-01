@@ -14,6 +14,8 @@ import {
   MessageFlags,
   ModalBuilder,
   PermissionFlagsBits,
+  RoleSelectMenuBuilder,
+  RoleSelectMenuInteraction,
   SectionBuilder,
   SeparatorBuilder,
   SeparatorSpacingSize,
@@ -32,8 +34,11 @@ interface DailyServerSettingsProps {
   interaction: Interaction;
 }
 
-export function DailyServerSettings({ settings, interaction }: DailyServerSettingsProps) {
-  const selectedChannel = interaction.guild?.channels.cache.get(settings.daily.channelId);
+export async function DailyServerSettings({ settings, interaction }: DailyServerSettingsProps) {
+  const selectedChannel = settings.daily.channelId
+    ? await interaction.guild?.channels.fetch(settings.daily.channelId)
+    : null;
+  const selectedRole = settings.daily.roleId ? await interaction.guild?.roles.fetch(settings.daily.roleId) : null;
 
   let mainContainer = new ContainerBuilder().addTextDisplayComponents(
     new TextDisplayBuilder().setContent("### Daily Messages")
@@ -52,13 +57,16 @@ export function DailyServerSettings({ settings, interaction }: DailyServerSettin
       new TextDisplayBuilder().setContent("Send a message for each daily leetcode challenge")
     );
 
-  const dailyChannelRow = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-    new ChannelSelectMenuBuilder()
-      .setPlaceholder("Daily channel or forum...")
-      .setCustomId("settings:guild-daily-select-channel")
-      .addChannelTypes([ChannelType.GuildText, ChannelType.GuildForum])
-      .setDefaultChannels([settings.daily.channelId])
-  );
+  const channelSelectBuilder = new ChannelSelectMenuBuilder()
+    .setPlaceholder("Daily channel or forum...")
+    .setCustomId("settings:guild-daily-select-channel")
+    .addChannelTypes([ChannelType.GuildText, ChannelType.GuildForum]);
+
+  if (settings.daily.channelId) {
+    channelSelectBuilder.setDefaultChannels([settings.daily.channelId]);
+  }
+
+  const dailyChannelRow = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(channelSelectBuilder);
 
   let dailyChannelWarningRow: TextDisplayBuilder | null = null;
 
@@ -114,6 +122,35 @@ export function DailyServerSettings({ settings, interaction }: DailyServerSettin
     }
   }
 
+  const dailyRoleToggleRow = new SectionBuilder()
+    .setButtonAccessory(
+      ToggleButton({
+        isEnabled: settings.daily.useRolePing,
+        customIdEnable: "settings:guild-daily-toggle-role-ping-enable",
+        customIdDisable: "settings:guild-daily-toggle-role-ping-disable",
+      })
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent("**Mention role**"),
+      new TextDisplayBuilder().setContent("Enable if a role should be pinged when dailies are posted")
+    );
+
+  const roleSelectBuilder = new RoleSelectMenuBuilder()
+    .setPlaceholder("Role to ping...")
+    .setCustomId("settings:guild-daily-select-role");
+
+  if (settings.daily.roleId) {
+    roleSelectBuilder.setDefaultRoles([settings.daily.roleId]);
+  }
+
+  const dailyRoleSelectRow = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(roleSelectBuilder);
+
+  let dailyRoleSelectWarning: TextDisplayBuilder | null = null;
+
+  if (selectedRole && settings.daily.roleId && !selectedRole.mentionable) {
+    dailyRoleSelectWarning = new TextDisplayBuilder().setContent(`**I can't mention this role!**`);
+  }
+
   const dailyCompactRow = new SectionBuilder()
     .setButtonAccessory(
       ToggleButton({
@@ -150,9 +187,8 @@ export function DailyServerSettings({ settings, interaction }: DailyServerSettin
   // no reason to show anything daily related if its disabled
 
   if (settings.daily.config.enabled) {
-    mainContainer = mainContainer
-      .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large).setDivider(true))
-      .addActionRowComponents(dailyChannelRow);
+    // channel
+    mainContainer = mainContainer.addActionRowComponents(dailyChannelRow);
 
     if (dailyChannelWarningRow) {
       mainContainer = mainContainer.addTextDisplayComponents(dailyChannelWarningRow);
@@ -169,10 +205,25 @@ export function DailyServerSettings({ settings, interaction }: DailyServerSettin
       }
     }
 
+    // mentions
+    mainContainer = mainContainer
+      .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large).setDivider(true))
+      .addSectionComponents(dailyRoleToggleRow);
+
+    if (settings.daily.useRolePing) {
+      mainContainer.addActionRowComponents(dailyRoleSelectRow);
+
+      if (dailyRoleSelectWarning) {
+        mainContainer = mainContainer.addTextDisplayComponents(dailyRoleSelectWarning);
+      }
+    }
+
+    // compact
     mainContainer = mainContainer
       .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large).setDivider(true))
       .addSectionComponents(dailyCompactRow);
 
+    // offset
     mainContainer = mainContainer
       .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large).setDivider(true))
       .addSectionComponents(dailyOffsetRow);
@@ -186,13 +237,13 @@ export function DailyServerSettings({ settings, interaction }: DailyServerSettin
 }
 
 async function paintServerSettings(
-  interaction: ChannelSelectMenuInteraction | ButtonInteraction,
+  interaction: ChannelSelectMenuInteraction | ButtonInteraction | RoleSelectMenuInteraction,
   guildService: GuildService
 ) {
   if (!interaction.guildId) return;
   const settings = await guildService.getGuildSettings(interaction.guildId);
   await interaction.editReply({
-    components: DailyServerSettings({ settings, interaction }),
+    components: await DailyServerSettings({ settings, interaction }),
     flags: MessageFlags.IsComponentsV2,
   });
 }
@@ -237,7 +288,7 @@ export async function DailyServerSettingsButtonHandling(interaction: ButtonInter
     await interaction.showModal(modal);
     return;
   }
-
+  // definitely not a modal call, handle normally now
   await interaction.deferUpdate();
   if (selection == "settings:guild-daily-toggle-active-enable") {
     await guildService.setDailyEnabled(interaction.guildId, true);
@@ -251,6 +302,10 @@ export async function DailyServerSettingsButtonHandling(interaction: ButtonInter
     await guildService.setDailyCompactEnabled(interaction.guildId, true);
   } else if (selection == "settings:guild-daily-toggle-compact-disable") {
     await guildService.setDailyCompactEnabled(interaction.guildId, false);
+  } else if (selection == "settings:guild-daily-toggle-role-ping-enable") {
+    await guildService.setDailyRolePingEnabled(interaction.guildId, true);
+  } else if (selection == "settings:guild-daily-toggle-role-ping-disable") {
+    await guildService.setDailyRolePingEnabled(interaction.guildId, false);
   }
   // refresh
   await paintServerSettings(interaction, guildService);
@@ -267,6 +322,22 @@ export async function DailyServerSettingsChannelHandling(
     if (selection) {
       // add more validation logic here
       await guildService.setDailyChannelId(interaction.guildId, selection);
+      await paintServerSettings(interaction, guildService);
+    }
+  }
+}
+
+export async function DailyServerSettingsRoleHandling(
+  interaction: RoleSelectMenuInteraction,
+  guildService: GuildService
+) {
+  await interaction.deferUpdate();
+  const selection = interaction.values[0];
+
+  if (interaction.context === InteractionContextType.Guild && interaction.guildId) {
+    if (selection) {
+      // add more validation logic here
+      await guildService.setDailyRolePingId(interaction.guildId, selection);
       await paintServerSettings(interaction, guildService);
     }
   }

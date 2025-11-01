@@ -11,6 +11,8 @@ const GuildSchema = new mongoose.Schema(
         useThreads: { type: Boolean, default: false },
         config: { type: MessageConfigSchema, required: true, default: {} },
         useCompact: { type: Boolean, default: false },
+        useRolePing: { type: Boolean, default: false },
+        roleId: { type: String, default: null },
       }),
       required: true,
       default: {},

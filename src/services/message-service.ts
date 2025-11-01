@@ -96,6 +96,7 @@ class MessageService {
       channelId: guild.daily.channelId,
       useThreads: guild.daily.useThreads,
       useCompact: guild.daily.useCompact,
+      roleId: guild.daily.roleId,
     };
 
     // get the absolute path to the module

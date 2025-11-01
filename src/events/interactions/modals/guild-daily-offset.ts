@@ -32,7 +32,7 @@ export const execute = async (interaction: ModalSubmitInteraction) => {
   if (message) {
     await message.edit({
       content: null,
-      components: DailyServerSettings({ settings, interaction }),
+      components: await DailyServerSettings({ settings, interaction }),
       flags: MessageFlags.IsComponentsV2,
     });
   }

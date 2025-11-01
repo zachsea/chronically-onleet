@@ -14,6 +14,7 @@ import {
   DailyServerSettings,
   DailyServerSettingsButtonHandling,
   DailyServerSettingsChannelHandling,
+  DailyServerSettingsRoleHandling,
 } from "../../components/settings/daily-server-settings.js";
 import UserService from "../../services/user-service.js";
 import { DailyUserSettings, DailyUserSettingsButtonHandling } from "../../components/settings/daily-user-settings.js";
@@ -114,7 +115,7 @@ async function postGuildSettings(interaction: ChatInputCommandInteraction) {
   });
   const settings = await guildService.getGuildSettings(interaction.guildId);
   await interaction.editReply({
-    components: DailyServerSettings({ settings, interaction }),
+    components: await DailyServerSettings({ settings, interaction }),
     flags: MessageFlags.IsComponentsV2,
   });
   const interactionFilter = (i: Interaction) =>
@@ -128,6 +129,12 @@ async function postGuildSettings(interaction: ChatInputCommandInteraction) {
   const channelCollector = response.resource?.message?.createMessageComponentCollector({
     filter: interactionFilter,
     componentType: ComponentType.ChannelSelect,
+    time: 3600000, // 1 hour
+  });
+
+  const roleCollector = response.resource?.message?.createMessageComponentCollector({
+    filter: interactionFilter,
+    componentType: ComponentType.RoleSelect,
     time: 3600000, // 1 hour
   });
 
@@ -146,6 +153,18 @@ async function postGuildSettings(interaction: ChatInputCommandInteraction) {
   channelCollector?.on("collect", async (i) => {
     try {
       await DailyServerSettingsChannelHandling(i, guildService);
+    } catch (error) {
+      console.error(error);
+      await i.followUp({
+        content: "There was an unexpected error for that interaction, sorry!",
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+  });
+
+  roleCollector?.on("collect", async (i) => {
+    try {
+      await DailyServerSettingsRoleHandling(i, guildService);
     } catch (error) {
       console.error(error);
       await i.followUp({

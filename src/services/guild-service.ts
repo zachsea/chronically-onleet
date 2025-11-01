@@ -129,6 +129,42 @@ class GuildService {
     }
   }
 
+  async getDailyRolePingEnabled(guildId: string) {
+    const guild = await this.getGuild(guildId);
+    if (!guild) throw Error("Guild not found");
+    return guild.daily.useRolePing;
+  }
+
+  async setDailyRolePingEnabled(guildId: string, enabled: boolean) {
+    const guild = await this.getGuild(guildId);
+    if (!guild) throw Error("Guild not found");
+    guild.daily.useRolePing = enabled;
+    try {
+      await guild.save();
+    } catch (err) {
+      console.error(`Failed to save daily.useRolePing for guild ${guildId}:`, err);
+      throw err;
+    }
+  }
+
+  async getDailyRolePingId(guildId: string) {
+    const guild = await this.getGuild(guildId);
+    if (!guild) throw Error("Guild not found");
+    return guild.daily.roleId;
+  }
+
+  async setDailyRolePingId(guildId: string, roleId: string) {
+    const guild = await this.getGuild(guildId);
+    if (!guild) throw Error("Guild not found");
+    guild.daily.roleId = roleId;
+    try {
+      await guild.save();
+    } catch (err) {
+      console.error(`Failed to save daily.roleId for guild ${guildId}:`, err);
+      throw err;
+    }
+  }
+
   async getDailyCompactEnabled(guildId: string) {
     const guild = await this.getGuild(guildId);
     if (!guild) throw Error("Guild not found");
@@ -157,6 +193,8 @@ class GuildService {
         useThreads: guild.daily.useThreads,
         config: guild.daily.config,
         useCompact: guild.daily.useCompact,
+        useRolePing: guild.daily.useRolePing,
+        roleId: guild.daily.roleId,
       },
     };
   }
