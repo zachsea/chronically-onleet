@@ -15,9 +15,10 @@ export async function createMissingForumTags(channel: ForumChannel) {
   const desiredTags = [easyTag, mediumTag, hardTag, dailyTag];
   const existingTags = channel.availableTags;
 
-  const tagsToAdd = desiredTags.filter(
-    (desiredTag) => !existingTags.some((existingTag) => existingTag.name === desiredTag.name)
-  );
+  // check case-insensitively to avoid duplicates
+  const existingTagNames = new Set(existingTags.map((tag) => tag.name.toLowerCase()));
+
+  const tagsToAdd = desiredTags.filter((desiredTag) => !existingTagNames.has(desiredTag.name.toLowerCase()));
 
   if (tagsToAdd.length === 0) return;
 

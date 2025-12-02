@@ -68,10 +68,34 @@ export async function sendProblemToChannel(client: Client, options: SendProblemO
         await createMissingForumTags(channel);
       } catch (error) {
         console.error("Failed to create missing forum tags:", error);
-        tagCreationError = true;
+        // only set error if we actually needed to create tags but failed
+        const existingTagNames = new Set(channel.availableTags.map((tag) => tag.name.toLowerCase()));
+        const requiredTags = isDaily ? [dailyTag.name.toLowerCase()] : [];
+        if (problem.difficulty) {
+          const difficultyTag = getDifficultyForumTag(problem.difficulty);
+          if (difficultyTag) {
+            requiredTags.push(difficultyTag.name.toLowerCase());
+          }
+        }
+        const missingRequiredTags = requiredTags.filter((tag) => !existingTagNames.has(tag));
+        if (missingRequiredTags.length > 0) {
+          tagCreationError = true;
+        }
       }
     } else {
-      tagCreationError = true;
+      // check if required tags exist before showing error
+      const existingTagNames = new Set(channel.availableTags.map((tag) => tag.name.toLowerCase()));
+      const requiredTags = isDaily ? [dailyTag.name.toLowerCase()] : [];
+      if (problem.difficulty) {
+        const difficultyTag = getDifficultyForumTag(problem.difficulty);
+        if (difficultyTag) {
+          requiredTags.push(difficultyTag.name.toLowerCase());
+        }
+      }
+      const missingRequiredTags = requiredTags.filter((tag) => !existingTagNames.has(tag));
+      if (missingRequiredTags.length > 0) {
+        tagCreationError = true;
+      }
     }
 
     let components = ProblemForumPost(problem, useCompact);
@@ -96,17 +120,21 @@ export async function sendProblemToChannel(client: Client, options: SendProblemO
     const appliedTags: string[] = [];
 
     if (isDaily) {
-      const dailyTagId = channel.availableTags.find((tag) => tag.name === dailyTag.name)?.id;
+      const dailyTagId = channel.availableTags.find(
+        (tag) => tag.name.toLowerCase() === dailyTag.name.toLowerCase()
+      )?.id;
       if (dailyTagId) appliedTags.push(dailyTagId);
     }
 
     if (problem.difficulty) {
       const difficultyTag = getDifficultyForumTag(problem.difficulty);
-      const difficultyTagId = channel.availableTags.find((tag) => tag.name === difficultyTag?.name)?.id;
+      const difficultyTagId = difficultyTag
+        ? channel.availableTags.find((tag) => tag.name.toLowerCase() === difficultyTag.name.toLowerCase())?.id
+        : undefined;
       if (difficultyTagId) appliedTags.push(difficultyTagId);
     }
 
-    // add error message if tags couldn't be created
+    // add error message if tags couldn't be created and are actually needed
     if (tagCreationError) {
       const errorField = new TextDisplayBuilder({
         content: `**Missing permissions to create tags**\nI tried to create some tags to use with this forum post, but I don't have permissions to manage this channel.`,
