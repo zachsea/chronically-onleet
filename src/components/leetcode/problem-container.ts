@@ -30,7 +30,7 @@ const addHTMLContent = (parentBuilder: ContainerBuilder, content: string) => {
   }, parentBuilder);
 };
 
-export default function ProblemContainer(problem: Problem, useCompact = false) {
+export default function ProblemContainer(problem: Problem, useCompact = false, isDaily = false) {
   const transformedContent = turndownService.turndown(problem.content);
   let contentContainer = new ContainerBuilder().addSectionComponents(
     new SectionBuilder()
@@ -58,19 +58,22 @@ export default function ProblemContainer(problem: Problem, useCompact = false) {
     contentContainer = addHTMLContent(contentContainer, transformedContent);
   }
 
-  return [
-    contentContainer,
-    new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder()
-        .setLabel("Open Problem")
-        .setStyle(ButtonStyle.Link)
-        .setURL(`https://leetcode.com/problems/${problem.titleSlug}/`),
+  const buttons = [
+    new ButtonBuilder()
+      .setLabel("Open Problem")
+      .setStyle(ButtonStyle.Link)
+      .setURL(`https://leetcode.com/problems/${problem.titleSlug}/`),
+  ];
+
+  if (isDaily) {
+    buttons.push(
       new ButtonBuilder()
         .setLabel("Remind me...")
-        .setCustomId("set-reminder:daily")
+        .setCustomId("reminder:set:daily")
         .setStyle(ButtonStyle.Primary)
-        .setDisabled(true)
         .setEmoji("⏰")
-    ),
-  ];
+    );
+  }
+
+  return [contentContainer, new ActionRowBuilder<ButtonBuilder>().addComponents(...buttons)];
 }

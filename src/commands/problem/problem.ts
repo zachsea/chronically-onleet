@@ -186,7 +186,7 @@ export async function executeSend(interaction: ChatInputCommandInteraction) {
     return;
   }
 
-  const components = ProblemContainer(problem, useCompact);
+  const components = ProblemContainer(problem, useCompact, false);
   await interaction.editReply({
     content: null,
     components,

@@ -1,5 +1,4 @@
-// services/message-service.ts
-import { ChannelType, MessageFlags, ShardingManager } from "discord.js";
+import { ChannelType, MessageFlags, ShardingManager, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import mongoose from "mongoose";
 import Delivery, { DeliveryDocument } from "../models/delivery.js";
 import Guild, { GuildDocument } from "../models/guild.js";
@@ -9,6 +8,7 @@ import { Problem } from "leetcode-query";
 import ProblemContainer from "../components/leetcode/problem-container.js";
 import { SendProblemOptions } from "./problem-sender.js";
 import GuildService from "./guild-service.js";
+import ReminderService from "./reminder-service.js";
 
 interface MessageServiceOptions {
   pollIntervalMs?: number;
@@ -18,11 +18,13 @@ class MessageService {
   manager: ShardingManager;
   options: MessageServiceOptions;
   guildService: GuildService;
+  reminderService: ReminderService;
 
   constructor(manager: ShardingManager, options: MessageServiceOptions = {}) {
     this.manager = manager;
     this.options = options;
     this.guildService = new GuildService();
+    this.reminderService = new ReminderService();
     if (!mongoose.connection.readyState) {
       throw new Error("MongoDB is not connected");
     }
@@ -77,6 +79,8 @@ class MessageService {
       // we need to chill so discord doesn't get mad
       await new Promise((resolve) => setTimeout(resolve, 250));
     });
+
+    await this.processReminders();
   }
 
   private async sendDelivery(delivery: DeliveryDocument, daily: Problem) {
@@ -197,7 +201,7 @@ class MessageService {
     const userId = user.userId;
 
     const messageContent = {
-      components: ProblemContainer(problem, user.daily.useCompact),
+      components: ProblemContainer(problem, user.daily.useCompact, true),
       flags: MessageFlags.IsComponentsV2,
     } as const;
 
@@ -221,6 +225,72 @@ class MessageService {
     } else {
       console.error(`User ${userId} not found in any shard`);
       throw Error("No shard sent a successful message for the delivery");
+    }
+  }
+
+  private async processReminders() {
+    try {
+      const reminders = await this.reminderService.getPendingReminders();
+      const dailyProblem = await getDailyProblem();
+      const problemUrl = dailyProblem
+        ? `https://leetcode.com/problems/${dailyProblem.titleSlug}/`
+        : "https://leetcode.com/problems/";
+      const maxAttempts = 3;
+
+      for (const reminder of reminders) {
+        try {
+          reminder.attemptCount += 1;
+          await reminder.save();
+
+          await this.sendReminderToUser(reminder.userId, problemUrl);
+          await this.reminderService.cancelReminder(reminder.userId);
+          console.debug(`Reminder sent to ${reminder.userId} and deleted`);
+          // chill
+          await new Promise((resolve) => setTimeout(resolve, 250));
+        } catch (err) {
+          if (reminder.attemptCount >= maxAttempts) {
+            console.error(`Reminder for ${reminder.userId} failed after ${maxAttempts} attempts, giving up:`, err);
+            await this.reminderService.cancelReminder(reminder.userId);
+          } else {
+            console.error(
+              `Failed to send reminder to ${reminder.userId} (attempt ${reminder.attemptCount}/${maxAttempts}):`,
+              err
+            );
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Error processing reminders:", err);
+    }
+  }
+
+  private async sendReminderToUser(userId: string, problemUrl: string) {
+    const result = await this.manager.broadcastEval<
+      { success: true; shardId: number | null } | null,
+      { userId: string; problemUrl: string }
+    >(
+      async (bot, context) => {
+        const user = await bot.users.fetch(context.userId);
+        if (user) {
+          const button = new ActionRowBuilder<ButtonBuilder>().addComponents(
+            new ButtonBuilder().setLabel("Open Daily Problem").setStyle(ButtonStyle.Link).setURL(context.problemUrl)
+          );
+          await user.send({
+            content: "Your reminder for today's daily problem.",
+            components: [button],
+          });
+          return { success: true, shardId: bot.shard?.ids?.[0] ?? null };
+        }
+
+        return null;
+      },
+      { context: { userId, problemUrl } }
+    );
+
+    const successfulShard = result.find((r) => r !== null);
+
+    if (!successfulShard) {
+      throw Error(`User ${userId} not found in any shard`);
     }
   }
 }

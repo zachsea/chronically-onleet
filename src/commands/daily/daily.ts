@@ -71,7 +71,7 @@ async function executeSend(interaction: ChatInputCommandInteraction) {
     return;
   }
   // use the components to display the problem for now
-  const components = ProblemContainer(dailyProblem, useCompact);
+  const components = ProblemContainer(dailyProblem, useCompact, true);
   try {
     await interaction.editReply({ content: null, components, flags: MessageFlags.IsComponentsV2 });
   } catch (error) {

@@ -163,7 +163,7 @@ export async function sendProblemToChannel(client: Client, options: SendProblemO
 
   if (useThreads) {
     const messageContent = {
-      components: ProblemContainer(problem, useCompact),
+      components: ProblemContainer(problem, useCompact, isDaily),
       flags: MessageFlags.IsComponentsV2,
     } as const;
 
@@ -178,7 +178,7 @@ export async function sendProblemToChannel(client: Client, options: SendProblemO
     // boring no-thread no-forum message
     const components = [
       new TextDisplayBuilder({ content: `## Daily for ${dateString}` }),
-      ...ProblemContainer(problem, useCompact),
+      ...ProblemContainer(problem, useCompact, isDaily),
     ];
 
     if (role && role.mentionable) {
