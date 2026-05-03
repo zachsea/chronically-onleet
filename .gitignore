@@ -117,3 +117,5 @@ dist
 .pnp.*
 
 compose.yml
+
+.DS_Store
