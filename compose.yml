@@ -1,0 +1,36 @@
+services:
+  bot:
+    build:
+      context: ./bot
+    environment:
+      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - MONGODB_URI=mongodb://mongo:27017/leetcode-bot
+      - REDIS_URI=redis://redis:6379
+    depends_on:
+      - mongo
+      - redis
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./web
+    ports:
+      - "${WEB_PORT:-80}:80"
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7-jammy
+    volumes:
+      - mongo-data:/data/db
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+volumes:
+  mongo-data:
+  redis-data:
